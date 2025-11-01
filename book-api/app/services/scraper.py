@@ -119,34 +119,32 @@ class BookScraper:
             return None
     
     def get_book_description(self, book_url):
-        """Obtém a descrição completa do livro - VERSÃO OTIMIZADA"""
         try:
             response = self.session.get(book_url)
             soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # ESTRATÉGIA 1: Descrição após div product_description
+
+            # v1: Descrição após div product_description
             product_desc_div = soup.find('div', id='product_description')
             if product_desc_div:
                 next_p = product_desc_div.find_next_sibling('p')
                 if next_p and next_p.text.strip():
                     description = next_p.text.strip()
-                    # LIMITA para 500 caracteres
+                    # Limitando a 500 caracteres
                     if len(description) > 500:
                         return description[:500] + "..."
                     return description
-            
-            # ESTRATÉGIA 2: Meta tag description
+
+            # v2: tentando pelo meta tag description
             meta_desc = soup.find('meta', attrs={'name': 'description'})
             if meta_desc and meta_desc.get('content'):
                 desc = meta_desc['content'].strip()
                 if desc and desc not in ["", "No description available", "Books to Scrape"]:
-                    # LIMITA para 500 caracteres
                     if len(desc) > 500:
                         return desc[:500] + "..."
                     return desc
-            
-            return "Description not available"
-                
+
+            return "Descrição não disponível no momento."
+
         except Exception as e:
             logger.error(f"Error getting book description from {book_url}: {e}")
-            return "Description not available"
+            return "Descrição não disponível no momento."
