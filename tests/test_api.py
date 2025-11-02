@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app import create_app
 import json
 
-def quick_deploy_test():
+def test_quick_deploy():
     
     try:
         app = create_app()
@@ -45,7 +45,7 @@ def quick_deploy_test():
         return False
 
 if __name__ == "__main__":
-    success = quick_deploy_test()
+    success = test_quick_deploy()
     
     print("\n" + "=" * 40)
     if success:
