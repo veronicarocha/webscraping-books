@@ -4,6 +4,7 @@ import json
 import plotly.express as px
 from datetime import datetime, timedelta
 import os
+import requests
 
 st.set_page_config(page_title="Book API - Dashboard", layout="wide")
 st.title("📊 Book API - Monitoramento")
@@ -11,132 +12,170 @@ st.title("📊 Book API - Monitoramento")
 st.sidebar.header("Configurações")
 date_range = st.sidebar.selectbox("Período", ["Últimas 24h", "Última semana", "Último mês"])
 
+def fetch_api_data():
+    """Busca os dados da API"""
+    try:
+        # URL da sua API no Railway
+        base_url = "https://web-production-962ea.up.railway.app/api/v1"  # fix url nova
+        
+        stats_response = requests.get(f"{base_url}/stats/overview")
+        books_response = requests.get(f"{base_url}/books?per_page=5")
+        categories_response = requests.get(f"{base_url}/categories")
+        
+        stats = stats_response.json() if stats_response.status_code == 200 else {}
+        books = books_response.json() if books_response.status_code == 200 else {}
+        categories = categories_response.json() if categories_response.status_code == 200 else {}
+        
+        return {
+            'stats': stats,
+            'books': books,
+            'categories': categories
+        }
+    except Exception as e:
+        st.error(f"Erro ao conectar com a API: {e}")
+        return {}
+
 def load_logs():
+    """Tenta carregar logs locais (para dev)"""
     logs = []
-    log_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs', 'api_monitor.log')
+    try:
+        # Tenta encontrar o arquivo de log
+        possible_paths = [
+            os.path.join('logs', 'api_monitor.log'),
+            os.path.join('..', 'logs', 'api_monitor.log'),
+            os.path.join(os.path.dirname(__file__), 'logs', 'api_monitor.log'),
+        ]
+        
+        for log_path in possible_paths:
+            if os.path.exists(log_path):
+                with open(log_path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        if line.strip():
+                            try:
+                                log_data = json.loads(line.strip())
+                                logs.append(log_data)
+                            except:
+                                continue
+                break
+    except Exception as e:
+        st.warning(f"Logs não disponíveis: {e}")
     
-    if os.path.exists(log_file):
-        try:
-            with open(log_file, 'r', encoding='utf-8') as f:
-                for line in f:
-                    if line.strip():
-                        try:
-                            log_data = json.loads(line.strip())
-                            # correção - Se message for string, converte para dict
-                            if isinstance(log_data.get('message'), str):
-                                try:
-                                    log_data['message'] = json.loads(log_data['message'])
-                                except:
-                                    pass
-                            logs.append(log_data)
-                        except:
-                            continue
-            return logs
-        except Exception as e:
-            st.error(f"Erro ao ler logs: {e}")
-    return []
+    return logs
+
+api_data = fetch_api_data()
 
 logs = load_logs()
 
-if not logs:
-    st.warning(" Nenhum log encontrado")
-    st.info(" Execute requisições na API e atualize esta página")
+if not api_data.get('stats') and not logs:
+    st.warning("📡 Conectando à API...")
+    
+    # Mostrar informações básicas mesmo sem dados
+    st.info("""
+    **Para visualizar dados completos:**
+    1. Certifique-se que a API está rodando no Railway
+    2. Acesse os endpoints:
+       - `/api/v1/stats/overview` - Estatísticas gerais
+       - `/api/v1/books` - Lista de livros
+       - `/api/v1/categories` - Categorias
+    """)
+    
+    # Tentar mostrar dados básicos mesmo sem API
+    st.subheader("📊 Informações Básicas")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Status API", "🟢 Online" if api_data else "🟡 Conectando")
+    
+    with col2:
+        st.metric("Modo", "Produção")
+    
+    with col3:
+        st.metric("Dashboard", "Operacional")
+    
     st.stop()
 
-# Processar dados
-processed_data = []
-for log in logs:
-    try:
-        message_data = log.get('message', {}) if isinstance(log.get('message'), dict) else log.copy()
+if api_data.get('stats'):
+    st.subheader("🎯 Estatísticas da API")
+    
+    stats = api_data['stats']
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        total_books = stats.get('total_books', 0)
+        st.metric("Total Livros", total_books)
+    
+    with col2:
+        total_categories = stats.get('total_categories', 0)
+        st.metric("Categorias", total_categories)
+    
+    with col3:
+        avg_rating = stats.get('average_rating', 0)
+        st.metric("Rating Médio", f"{avg_rating:.1f}⭐")
+    
+    with col4:
+        avg_price = stats.get('average_price', 0)
+        st.metric("Preço Médio", f"£{avg_price:.2f}")
+
+# GRÁFICOS 
+if api_data.get('categories'):
+    st.subheader("📈 Visualizações")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        categories_data = api_data['categories']
+        if isinstance(categories_data, list) and len(categories_data) > 0:
+            cat_df = pd.DataFrame(categories_data)
+            fig_cats = px.bar(cat_df, x='name', y='book_count', 
+                            title='Livros por Categoria')
+            st.plotly_chart(fig_cats, use_container_width=True)
+    
+    with col2:
+        if api_data.get('books') and isinstance(api_data['books'], list):
+            books_df = pd.DataFrame(api_data['books'])
+            if 'price' in books_df.columns:
+                fig_price = px.histogram(books_df, x='price', 
+                                       title='Distribuição de Preços')
+                st.plotly_chart(fig_price, use_container_width=True)
+
+if api_data.get('books'):
+    st.subheader("📚 Livros Recentes")
+    books_data = api_data['books']
+    if isinstance(books_data, list) and len(books_data) > 0:
+        books_df = pd.DataFrame(books_data)
+        display_cols = ['title', 'price', 'rating', 'category']
+        available_cols = [col for col in display_cols if col in books_df.columns]
         
-        row_data = {
-            'timestamp': message_data.get('timestamp', log.get('timestamp')),
-            'method': message_data.get('method'),
-            'endpoint': message_data.get('endpoint'),
-            'status_code': message_data.get('status_code'),
-            'processing_time': message_data.get('processing_time_seconds')
-        }
-        processed_data.append(row_data)
-    except:
-        continue
+        if available_cols:
+            st.dataframe(books_df[available_cols].head(10))
 
-# Criar DataFrame
-df = pd.DataFrame(processed_data)
-df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
-df = df.dropna(subset=['timestamp'])
+# SEÇÃO DE LOGS 
+if logs:
+    st.subheader("📋 Logs do Sistema")
+    
+    # Processar logs
+    processed_data = []
+    for log in logs:
+        try:
+            if isinstance(log, dict):
+                row_data = {
+                    'timestamp': log.get('timestamp'),
+                    'level': log.get('level'),
+                    'message': str(log.get('message', ''))[:100] + '...' if log.get('message') else ''
+                }
+                processed_data.append(row_data)
+        except:
+            continue
+    
+    if processed_data:
+        logs_df = pd.DataFrame(processed_data)
+        if 'timestamp' in logs_df.columns:
+            logs_df['timestamp'] = pd.to_datetime(logs_df['timestamp'], errors='coerce')
+            logs_df = logs_df.dropna(subset=['timestamp'])
+            st.dataframe(logs_df.tail(10).sort_values('timestamp', ascending=False))
 
-if df.empty:
-    st.error(" Nenhum dado válido para mostrar")
-    st.stop()
-
-# ✅ CORREÇÃO: Converter timestamps para o mesmo tipo
-df['timestamp'] = df['timestamp'].dt.tz_convert(None)  
-
-# criar filtros por data
-now = datetime.now()
-if date_range == "Últimas 24h":
-    cutoff = now - timedelta(hours=24)
-elif date_range == "Última semana":
-    cutoff = now - timedelta(days=7)
-else:
-    cutoff = now - timedelta(days=30)
-
-df = df[df['timestamp'] >= cutoff]
-
-if df.empty:
-    st.warning(" Nenhum dado no período selecionado")
-    st.stop()
-
-# Métricas principais
-st.subheader("Métricas Principais")
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.metric("Total Requisições", len(df))
-
-with col2:
-    error_count = len(df[df['status_code'] >= 400]) if 'status_code' in df.columns else 0
-    error_rate = (error_count / len(df) * 100) if len(df) > 0 else 0
-    st.metric("Taxa de Erro", f"{error_rate:.1f}%")
-
-with col3:
-    avg_time = df['processing_time'].mean() if 'processing_time' in df.columns else 0
-    st.metric("Tempo Médio", f"{avg_time:.3f}s")
-
-with col4:
-    unique_eps = df['endpoint'].nunique() if 'endpoint' in df.columns else 0
-    st.metric("Endpoints", unique_eps)
-
-# Gráficos
-st.subheader("📊 Visualizações")
-col1, col2 = st.columns(2)
-
-with col1:
-    if 'timestamp' in df.columns:
-        df_hourly = df.groupby(df['timestamp'].dt.hour).size()
-        fig_hourly = px.line(x=df_hourly.index, y=df_hourly.values, 
-                           title='Requisições por Hora', labels={'x': 'Hora', 'y': 'Requisições'})
-        st.plotly_chart(fig_hourly, use_container_width=True)
-
-with col2:
-    if 'endpoint' in df.columns:
-        endpoint_counts = df['endpoint'].value_counts().head(8)
-        fig_endpoints = px.bar(x=endpoint_counts.index, y=endpoint_counts.values,
-                             title='Endpoints Mais Acessados')
-        st.plotly_chart(fig_endpoints, use_container_width=True)
-
-# Tabela de logs
-st.subheader("📋 Logs Recentes")
-display_cols = ['timestamp', 'method', 'endpoint']
-if 'status_code' in df.columns:
-    display_cols.append('status_code')
-if 'processing_time' in df.columns:
-    display_cols.append('processing_time')
-
-st.dataframe(df[display_cols].tail(15).sort_values('timestamp', ascending=False))
-
-# Status do sistema
 st.sidebar.header("Status do Sistema")
-st.sidebar.info(f"📊 Logs carregados: {len(logs)}")
+st.sidebar.info(f"📊 Dados da API: {'✅' if api_data else '❌'}")
+st.sidebar.info(f"📋 Logs disponíveis: {len(logs)}")
 st.sidebar.info(f"📅 Período: {date_range}")
-st.sidebar.success("🟢 Sistema operacional")
+st.sidebar.success("🟢 Dashboard operacional")

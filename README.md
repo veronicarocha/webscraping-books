@@ -3,6 +3,12 @@
 ## 📖 Descrição
 API REST completa para consulta, gestão e recomendação de livros com sistema de machine learning integrado. Desenvolvida com arquitetura modular e escalável, incluindo monitoramento em tempo real.
 
+## Dados produtivos~
+A url da aplicação criada no Railway é :
+https://web-production-962ea.up.railway.app
+https://web-production-962ea.up.railway.app/api/v1/health
+
+
 ## 🏗️ Arquitetura
 - **Backend**: Flask + Flask-RESTful
 - **Database**: PostgreSQL (Produção) / SQLite (Desenvolvimento)
