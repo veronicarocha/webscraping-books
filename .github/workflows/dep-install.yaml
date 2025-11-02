@@ -18,7 +18,7 @@ jobs:
     - name: Instalar dependências
       run: |
         python -m pip install --upgrade pip
-        pip install -r /book-api/requirements.txt 
+        pip install -r requirements.txt 
         pip install pytest
 
     - name: Rodar testes com pytest
