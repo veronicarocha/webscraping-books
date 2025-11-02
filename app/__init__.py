@@ -15,6 +15,9 @@ def create_app():
     jwt = JWTManager(app)
     CORS(app)
     
+    from app.utils.monitoring import setup_monitoring
+    setup_monitoring(app)
+
     swagger = Swagger(app, template={
         "swagger": "2.0",
         "info": {

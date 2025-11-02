@@ -1,4 +1,10 @@
-# Conectar ao container PostgreSQL
+-- subir o dash
+$ streamlit run app.py
+
+-- ativar o vevn
+$ source venv/Scripts/activate
+
+-- Conectar ao container PostgreSQL
 docker exec -it postgres-books psql -U postgres -d booksapi
 
 -- conecta 

@@ -5,7 +5,7 @@ import os
 from datetime import timedelta
 
 class Config:
-    # Secrets - com fallback para desenvolvimento
+    #fallback para desenvolvimento
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-key-change-in-production')  
     

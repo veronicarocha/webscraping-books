@@ -22,9 +22,9 @@ def check_config():
         db_path = config.SQLALCHEMY_DATABASE_URI.replace('sqlite:///', '')
         if os.path.exists(db_path):
             size = os.path.getsize(db_path)
-            print(f"✅ Arquivo encontrado: {db_path} ({size} bytes)")
+            print(f" Arquivo encontrado: {db_path} ({size} bytes)")
         else:
-            print(f"❌ Arquivo NÃO encontrado: {db_path}")
+            print(f" Arquivo NÃO encontrado: {db_path}")
 
 if __name__ == '__main__':
     check_config()
