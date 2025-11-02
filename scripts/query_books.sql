@@ -4,8 +4,15 @@ $ streamlit run app.py
 -- ativar o vevn
 $ source venv/Scripts/activate
 
--- Conectar ao container PostgreSQL
+-- conectar ao container PostgreSQL
 docker exec -it postgres-books psql -U postgres -d booksapi
+
+-- para o Railway
+railway login
+railway list
+railway link
+railway run python -c "from app import create_app, db; app = create_app(); with app.app_context(): db.create_all(); print('✅ Tabelas criadas!')"
+
 
 -- conecta 
 \c booksapi

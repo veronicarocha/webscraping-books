@@ -15,6 +15,8 @@ def run_scraper():
     
     with app.app_context():
         try:
+            db.create_all()
+            
             logger.info("🚀 Starting book scraping...")
             
             scraper = BookScraper()
