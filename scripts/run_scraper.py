@@ -16,12 +16,12 @@ def run_scraper():
     with app.app_context():
         try:
             db.create_all()
-            
+
             logger.info("🚀 Starting book scraping...")
             
             scraper = BookScraper()
             
-            # Todo: max_categories=2 - para produção: max_categories=None
+            # Todo: max_categories=2 - para producao: max_categories=None
             books_data = scraper.get_all_books(max_categories=None)
             
             logger.info(f" Scraped {len(books_data)} books")

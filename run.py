@@ -9,7 +9,7 @@ app = create_app()
 
 with app.app_context():
     db.create_all()
-    print(">>> ✅ Tabelas criadas - SCRAPER MANUAL DESATIVADO")
+    print(">>>  Tabelas criadas - SCRAPER VIA COMANDO CLI")
 
 if __name__ == '__main__':
     print(f">>> Iniciando Book API em modo: {Config.check_environment()}")
