@@ -6,14 +6,14 @@ from app.models.book import Book
 import logging
 from config import Config
 from datetime import datetime, timezone 
-from sqlalchemy import text  # ✅ MANTER ESTE IMPORT
+from sqlalchemy import text 
 
 logger = logging.getLogger(__name__)
 
 class HealthCheck(Resource):
     def get(self):
         try:
-            # ✅ CORREÇÃO: usar text() no Railway, manter compatibilidade
+            # CORREÇÃO: usar text() no Railway
             from app.models.book import db
             
             # Tenta com text() primeiro (Railway), depois sem (local)
