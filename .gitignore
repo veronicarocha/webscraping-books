@@ -1,23 +1,17 @@
-# Python cache
 __pycache__/
 *.pyc
 
-# Environments
 .env
 .venv
 venv_311/
 
-# IDE
 .vscode/
 .idea/
 
-# OS
 .DS_Store
 Thumbs.db
 
-# Database files (não versionar bancos)
 *.db
 instance/books.db
 
-# Logs
 *.log

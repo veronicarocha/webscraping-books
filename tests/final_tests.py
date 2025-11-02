@@ -6,9 +6,6 @@ from app import create_app
 import json
 
 def quick_deploy_test():
-    """Teste rápido para verificar se a API está pronta para deploy"""
-    print("🧪 TESTE RÁPIDO PARA DEPLOY")
-    print("=" * 40)
     
     try:
         app = create_app()

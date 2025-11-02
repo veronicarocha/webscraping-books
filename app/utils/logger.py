@@ -14,7 +14,6 @@ class StructuredLogger:
             
         self.logger.setLevel(logging.INFO)
         
-        # Formatação estruturada JSON
         formatter = logging.Formatter(
             '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "module": "%(name)s", "message": %(message)s}'
         )
@@ -41,9 +40,11 @@ class StructuredLogger:
     def log_request(self, response=None):
         """Log para todas as requisições"""
         try:
+            from flask import request, g
+
             request_time = getattr(g, 'request_time', None)
             processing_time = time.time() - request_time if request_time else 0
-            
+
             log_data = {
                 "method": request.method if request else "UNKNOWN",
                 "endpoint": request.endpoint if request else "UNKNOWN",
@@ -54,12 +55,12 @@ class StructuredLogger:
                 "ip_address": request.remote_addr if request else None,
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
-            
+
             self.logger.info(json.dumps(log_data))
-        except Exception as e:
-            # Fallback seguro
-            print(f" Erro no logging: {e}")
         
+        except Exception as e:
+            print(f" Erro no logging: {e}")
+
         return response
 
 api_logger = StructuredLogger()
