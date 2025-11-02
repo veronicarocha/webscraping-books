@@ -6,15 +6,22 @@ from app.models.book import Book
 import logging
 from config import Config
 from datetime import datetime, timezone 
+from sqlalchemy import text  # ✅ MANTER ESTE IMPORT
 
 logger = logging.getLogger(__name__)
 
 class HealthCheck(Resource):
     def get(self):
         try:
-            # fix - não falhar se tabelas não existirem
+            # ✅ CORREÇÃO: usar text() no Railway, manter compatibilidade
             from app.models.book import db
-            db.session.execute('SELECT 1')
+            
+            # Tenta com text() primeiro (Railway), depois sem (local)
+            try:
+                db.session.execute(text('SELECT 1'))
+            except:
+                db.session.execute('SELECT 1')
+                
             database_status = 'healthy'
         except Exception as e:
             database_status = f'degraded: {str(e)}'
