@@ -21,9 +21,12 @@ class Config:
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
     
+    JSON_AS_ASCII = False  
+    JSONIFY_PRETTYPRINT_REGULAR = True 
+    JSON_SORT_KEYS = False
+
     @classmethod
     def check_environment(cls):
-        """Verifica se está em produção baseado nas variáveis"""
         is_production = all([
             os.environ.get('SECRET_KEY'),
             os.environ.get('JWT_SECRET_KEY'), 

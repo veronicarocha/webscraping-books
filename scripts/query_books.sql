@@ -7,6 +7,13 @@ $ source venv/Scripts/activate
 -- conectar ao container PostgreSQL
 docker exec -it postgres-books psql -U postgres -d booksapi
 
+-- limpar o cache do flask 
+python -c "import app; print('Cache limpo')"
+
+--limpar os caches do python
+find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+find . -name "*.pyc" -delete
+
 -- para o Railway
 railway login
 railway list

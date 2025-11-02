@@ -9,12 +9,19 @@ from config import Config
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    app.config['JSON_AS_ASCII'] = False
+    app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
     
     # Inicializa extensões
     db.init_app(app)
     jwt = JWTManager(app)
     CORS(app)
     
+    # registrar os comandos CLI
+    from app.commands import register_commands
+    register_commands(app)
+
     from app.utils.monitoring import setup_monitoring
     setup_monitoring(app)
 

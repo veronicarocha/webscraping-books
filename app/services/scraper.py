@@ -38,7 +38,7 @@ class BookScraper:
         Obtém a descrição do livro (limitada a 500 caracteres)
         """
         try:
-            # USA self.headers que agora existe
+            # usando o self.headers 
             response = self.session.get(url, headers=self.headers, timeout=15)
             response.raise_for_status()
             
@@ -49,10 +49,9 @@ class BookScraper:
             if description:
                 text = description.get_text(strip=True)
                 if text and text != "":
-                    # Limita a 500 caracteres como solicitado
+                    # Limita a 500 caracteres (tem umas extensas - ver depois)
                     return text[:500] + "..." if len(text) > 500 else text
             
-            # Estratégia fallback - procurar por parágrafos longos
             all_paragraphs = soup.find_all('p')
             for p in all_paragraphs:
                 text = p.get_text(strip=True)
@@ -62,7 +61,6 @@ class BookScraper:
             return "Descrição não disponível"
             
         except Exception as e:
-            # USA self.logger que agora existe
             self.logger.error(f"Erro ao obter descrição de {url}: {e}")
             return "Descrição não disponível"
 
@@ -167,7 +165,6 @@ class BookScraper:
                     elif cls.startswith('Four'): rating = 4
                     elif cls.startswith('Five'): rating = 5
 
-            # Imagem
             image_element = book_element.select_one('img')
             image_url = ""
             if image_element and image_element.get('src'):
@@ -179,18 +176,16 @@ class BookScraper:
                     image_relative_url = f'catalogue/{image_relative_url}'
                 image_url = urljoin(self.base_url, image_relative_url)
 
-            # Pega a descrição
             description = self.get_book_description(book_url)
 
             return {
                 'title': title,
-                'price': price,  # Já é float
+                'price': price,
                 'availability': availability,
-                'rating': rating,  # Já é integer
+                'rating': rating,  
                 'description': description,
                 'category': category_name,
-                'image_url': image_url,  # Nova campo
-                'url': book_url
+                'image_url': image_url
             }
 
         except Exception as e:

@@ -1,4 +1,5 @@
 import datetime
+from flask import Response, json, jsonify
 from flask_restful import Resource
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flasgger import swag_from
@@ -26,12 +27,17 @@ class HealthCheck(Resource):
         except Exception as e:
             database_status = f'degraded: {str(e)}'
         
-        return {
+        response_data = {
             'status': 'healthy',
             'environment': Config.check_environment(),
             'database': database_status,
             'timestamp': datetime.now(timezone.utc).isoformat()
-        }, 200
+        }
+        
+        return Response(
+            json.dumps(response_data, ensure_ascii=False),
+            mimetype='application/json; charset=utf-8'
+        )
 
 class ScrapingTrigger(Resource):
     @jwt_required()
