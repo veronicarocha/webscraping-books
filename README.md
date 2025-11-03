@@ -78,7 +78,7 @@ Rode os comandos abaixo em terminais separados:
 Terminal 1 - API Flask:
 
 ```bash
-python run.py
+python app.py
 # API: http://localhost:5000
 # Docs: http://localhost:5000/apidocs
 
