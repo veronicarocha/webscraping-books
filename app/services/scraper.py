@@ -1,99 +1,217 @@
-import os
+import requests
+from bs4 import BeautifulSoup
+import time
 import logging
-import click
-from flask.cli import with_appcontext
-from app.models.book import Book, db
-from app.services.scraper import BookScraper
+from urllib.parse import urljoin
 
-logger = logging.getLogger(__name__)
+class BookScraper:
+    def __init__(self, headless=True):
+        """
+        Inicializa o scraper com configurações básicas
+        """
+        self.base_url = "http://books.toscrape.com/"
+        self.session = requests.Session()
+        
+        # HEADERS necessário para evitar bloqueio
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+        }
+        
+        # LOGGER para debug e monitoramento
+        self.logger = logging.getLogger(__name__)
+        if not self.logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            self.logger.setLevel(logging.INFO)
+        
+        self.books_data = []
+        self.logger.info(" >>> BookScraper inicializado com sucesso")
 
-@click.command('scrape-books')
-@click.option('--max-categories', default=None, type=int, help='Limitar categorias pra teste')
-@click.option('--clean', is_flag=True, default=False, help='Limpar banco antes (só no RAILWAY)')
-@with_appcontext
-def scrape_books_command(max_categories, clean):
-    """Comando pra popular o banco - EXECUTAR APENAS NO RAILWAY"""
-    try:
-        if not os.environ.get('RAILWAY_ENVIRONMENT') and not os.environ.get('RAILWAY_SERVICE_NAME'):
-            logger.error(" ERRO: Scraping deve ser executado APENAS no ambiente Railway")
-            logger.error("   Comando correto: railway run flask scrape-books")
-            raise click.ClickException("Scraping bloqueado localmente - execute no Railway")
-        
-        logger.info("✅ Ambiente Railway detectado - Iniciando scraping...")
-        
-        scraper = BookScraper()
-        books_data = scraper.get_all_books(max_categories=max_categories)
-        
-        if clean:
-            # APENAS NO RAILWAY 
-            logger.info("🧹 Modo limpeza - removendo todos os livros...")
-            deleted_count = Book.query.delete()
-            added_count = 0
+    def get_book_description(self, url):
+        """
+        Obtém a descrição do livro (limitando a 500 caracteres - Todo ver depois)
+        """
+        try:
+            response = self.session.get(url, headers=self.headers, timeout=15)
+            response.raise_for_status()
             
-            for book_data in books_data:
-                book = Book(**book_data)
-                db.session.add(book)
-                added_count += 1
+            soup = BeautifulSoup(response.content, 'html.parser')
             
-            db.session.commit()
-            logger.info(f"✅ Limpeza completa: {deleted_count} removidos, {added_count} adicionados")
+            description = soup.select_one('#product_description + p')
+            if description:
+                text = description.get_text(strip=True)
+                if text and text != "":
+                    return text[:500] + "..." if len(text) > 500 else text
             
-        else:
-            #  usando Upsert
-            logger.info("🔄 Atualizando dados existentes...")
-            updated_count = 0
-            added_count = 0
-            skipped_count = 0
+            all_paragraphs = soup.find_all('p')
+            for p in all_paragraphs:
+                text = p.get_text(strip=True)
+                if text and len(text) > 50:
+                    return text[:500] + "..." if len(text) > 500 else text
             
-            for i, book_data in enumerate(books_data):
-                try:
-                    # Busca livro existente (titulo + categoria como chave única)
-                    existing_book = Book.query.filter_by(
-                        title=book_data['title'],
-                        category=book_data['category']
-                    ).first()
+            return "Descrição não disponível"
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao obter descrição de {url}: {e}")
+            return "Descrição não disponível"
+
+    def get_categories(self):
+        """Obtém todas as categorias de livros"""
+        try:
+            response = self.session.get(self.base_url, headers=self.headers)
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            categories = {}
+            sidebar = soup.select('.side_categories ul li ul li a')
+            
+            for category in sidebar:
+                category_name = category.get_text(strip=True)
+                category_url = urljoin(self.base_url, category['href'])
+                categories[category_name] = category_url
+                
+            self.logger.info(f"Encontradas {len(categories)} categorias")
+            return categories
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao obter categorias: {e}")
+            return {}
+
+    def scrape_category(self, category_name, category_url):
+        """Faz scraping de todos os livros de uma categoria"""
+        try:
+            self.logger.info(f"Scraping categoria: {category_name}")
+            page_url = category_url
+            
+            while page_url:
+                self.logger.info(f"Scraping página: {page_url}")
+                response = self.session.get(page_url, headers=self.headers)
+                soup = BeautifulSoup(response.content, 'html.parser')
+                
+                # Encontra todos os livros na página
+                books = soup.select('article.product_pod')
+                
+                for book in books:
+                    book_data = self.scrape_book_details(book, category_name)
+                    if book_data:
+                        self.books_data.append(book_data)
+                
+                # Verifica se há próxima página
+                next_button = soup.select_one('li.next a')
+                if next_button:
+                    page_url = urljoin(page_url, next_button['href'])
+                else:
+                    page_url = None
+                
+                time.sleep(1)  # Rate limiting
                     
-                    if existing_book:
-                        # ATUALIZA livro existente
-                        existing_book.price = book_data['price']
-                        existing_book.rating = book_data['rating']
-                        existing_book.availability = book_data['availability']
-                        existing_book.image_url = book_data.get('image_url', '')
-                        existing_book.description = book_data['description']
-                        updated_count += 1
-                        
-                        if i % 50 == 0:  # Log a cada 50 atualizações
-                            logger.info(f"📦 Progresso: {i}/{len(books_data)}...")
-                            
-                    else:
-                        # ADICIONA novo livro
-                        book = Book(**book_data)
-                        db.session.add(book)
-                        added_count += 1
-                        
-                except Exception as e:
-                    skipped_count += 1
-                    logger.warning(f"⚠️  Pulando livro {i}: {str(e)[:100]}")
-                    continue
+        except Exception as e:
+            self.logger.error(f"Erro ao fazer scraping da categoria {category_name}: {e}")
+
+    def scrape_book_details(self, book_element, category_name):
+        """Extrai detalhes de um livro individual com URL corrigida"""
+        try:
+            # URL do livro
+            book_link = book_element.select_one('h3 a')
+            if not book_link:
+                return None
+
+            # CORREÇÃO: Lidar corretamente com URLs relativas
+            book_relative_url = book_link['href']
+            while book_relative_url.startswith('../'):
+                book_relative_url = book_relative_url[3:]
+
+            if not book_relative_url.startswith('catalogue/'):
+                book_relative_url = f'catalogue/{book_relative_url}'
+
+            book_url = urljoin(self.base_url, book_relative_url)
+
+            # Informações básicas
+            title = book_link.get('title', '').strip()
+
+            # Preço - converte para float
+            price_element = book_element.select_one('.price_color')
+            price_text = price_element.get_text(strip=True) if price_element else "£0.00"
+            try:
+                price = float(price_text.replace('£', ''))
+            except:
+                price = 0.0
+
+            # Disponibilidade
+            availability = book_element.select_one('.instock.availability')
+            availability = availability.get_text(strip=True) if availability else "Out of stock"
+
+            # Rating - converte texto para número
+            rating_element = book_element.select_one('p.star-rating')
+            rating = 0  
+            if rating_element:
+                rating_classes = rating_element.get('class', [])
+                for cls in rating_classes:
+                    if cls.startswith('One'): rating = 1
+                    elif cls.startswith('Two'): rating = 2
+                    elif cls.startswith('Three'): rating = 3
+                    elif cls.startswith('Four'): rating = 4
+                    elif cls.startswith('Five'): rating = 5
+
+            image_element = book_element.select_one('img')
+            image_url = ""
+            if image_element and image_element.get('src'):
+                image_relative_url = image_element['src']
+                while image_relative_url.startswith('../'):
+                    image_relative_url = image_relative_url[3:]
+                if not image_relative_url.startswith('catalogue/'):
+                    image_relative_url = f'catalogue/{image_relative_url}'
+                image_url = urljoin(self.base_url, image_relative_url)
+
+            description = self.get_book_description(book_url)
+
+            return {
+                'title': title,
+                'price': price,
+                'availability': availability,
+                'rating': rating,  
+                'description': description,
+                'category': category_name,
+                'image_url': image_url
+            }
+
+        except Exception as e:
+            self.logger.error(f"Erro ao extrair detalhes do livro: {e}")
+            return None
+        
+    def get_all_books(self, max_categories=None):
+        """
+        Faz scraping de todos os livros de todas as categorias
+        max_categories: limite para teste (None = todas)
+        """
+        self.books_data = []  # Reset dos dados
+        
+        categories = self.get_categories()
+        
+        # Limita para teste se especificado
+        if max_categories:
+            categories = dict(list(categories.items())[:max_categories])
+            self.logger.info(f"🧪 Modo teste: processando {max_categories} categorias")
+        
+        total_categories = len(categories)
+        
+        for i, (category_name, category_url) in enumerate(categories.items(), 1):
+            self.logger.info(f"📦 Processando categoria {i}/{total_categories}: {category_name}")
+            self.scrape_category(category_name, category_url)
+            time.sleep(2)  # Rate limiting entre categorias
             
-            db.session.commit()
+        # Estatísticas finais
+        total_books = len(self.books_data)
+        with_desc = len([b for b in self.books_data if "Descrição não disponível" not in b['description']])
+        success_rate = (with_desc / total_books) * 100 if total_books else 0
+        
+        self.logger.info(f"🎊 SCRAPING COMPLETO!")
+        self.logger.info(f"📊 Total de livros: {total_books}")
+        self.logger.info(f"📈 Taxa de sucesso: {success_rate:.1f}%")
             
-            # Estatísticas 
-            total_processed = len(books_data)
-            success_rate = ((updated_count + added_count) / total_processed) * 100
-            
-            logger.info(f"""
-SCRAPING PRODUÇÃO COMPLETO!
-📊 Estatísticas:
-   •  Livros processados: {total_processed}
-   •  Novos livros adicionados: {added_count}
-   •  Livros atualizados: {updated_count}
-   •  Livros pulados: {skipped_count}
-   •  Taxa de sucesso: {success_rate:.1f}%
-   •  Total no banco: {Book.query.count()} livros
-            """)
-            
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"ERRO no scraping: {e}")
-        raise click.ClickException(f"Scraping falhou: {e}")
+        return self.books_data
