@@ -10,9 +10,10 @@ logger = logging.getLogger(__name__)
 @click.command('scrape-books')
 @click.option('--max-categories', default=None, type=int, help='Limitar categorias para teste')
 @click.option('--clean', is_flag=True, default=False, help='Limpar banco antes (só no RAILWAY)')
-@click.option('--offset', default=0, type=int, help='Pular X primeiras categorias')  
+@click.option('--offset', default=0, type=int, help='Pular X primeiras categorias')
 @with_appcontext
 def scrape_books_command(max_categories, clean, offset):
+    """Comando pra popular o banco - EXECUTAR APENAS NO RAILWAY"""
     try:
         if not os.environ.get('RAILWAY_ENVIRONMENT') and not os.environ.get('RAILWAY_SERVICE_NAME'):
             logger.error("ERRO: Scraping deve ser executado APENAS no ambiente Railway")
@@ -34,15 +35,15 @@ def scrape_books_command(max_categories, clean, offset):
         else:
             categories_to_process = all_categories
         
+        # APLICA MAX CATEGORIES - limita quantas processar
         if max_categories:
             categories_to_process = dict(list(categories_to_process.items())[:max_categories])
             logger.info(f"🔢 Limitando para {max_categories} categorias")
         
-        logger.info(f"🎯 Processando {len(categories_to_process)} categorias...")
+        logger.info(f"Processando {len(categories_to_process)} categorias...")
         
         if clean:
-            # APENAS NO RAILWAY - Limpeza completa
-            logger.info("🧹 Modo limpeza - removendo todos os livros...")
+            logger.info("Modo limpeza - removendo todos os livros...")
             deleted_count = Book.query.delete()
             
             # Scraping completo das categorias selecionadas
@@ -58,12 +59,11 @@ def scrape_books_command(max_categories, clean, offset):
                 added_count += 1
             
             db.session.commit()
-            logger.info(f"Limpeza completa: {deleted_count} removidos, {added_count} adicionados")
+            logger.info(f"✅ Limpeza completa: {deleted_count} removidos, {added_count} adicionados")
             
         else:
-            # PRODUÇÃO - usando Upsert inteligente
             total_added = 0
-            total_updated = 0
+            total_existing = 0
             skipped_count = 0
             processed_categories = 0
             
@@ -75,13 +75,12 @@ def scrape_books_command(max_categories, clean, offset):
                     category_books = scraper.scrape_single_category(category_name, category_url)
                     
                     if not category_books:
-                        logger.info(f"⏩ {category_name}: Nenhum livro encontrado - pulando")
+                        logger.info(f" {category_name}: Nenhum livro encontrado - pulando")
                         skipped_count += 1
                         continue
                     
-                    # UPSERT dos livros desta categoria
                     category_added = 0
-                    category_updated = 0
+                    category_existing = 0
                     
                     for book_data in category_books:
                         try:
@@ -92,15 +91,10 @@ def scrape_books_command(max_categories, clean, offset):
                             ).first()
                             
                             if existing_book:
-                                # ATUALIZA livro existente
-                                existing_book.price = book_data['price']
-                                existing_book.rating = book_data['rating']
-                                existing_book.availability = book_data['availability']
-                                existing_book.image_url = book_data.get('image_url', '')
-                                existing_book.description = book_data['description']
-                                category_updated += 1
+                                # LIVRO JÁ EXISTE - NÃO ATUALIZA, SÓ PULA
+                                category_existing += 1
                             else:
-                                # ADICIONA novo livro
+                                # ADICIONA NOVO livro
                                 book = Book(**book_data)
                                 db.session.add(book)
                                 category_added += 1
@@ -114,33 +108,20 @@ def scrape_books_command(max_categories, clean, offset):
                     db.session.commit()
                     
                     total_added += category_added
-                    total_updated += category_updated
+                    total_existing += category_existing
                     processed_categories += 1
                     
-                    logger.info(f"✅ {category_name}: +{category_added} novos, ↗{category_updated} atualizados")
+                    logger.info(f" {category_name}: +{category_added} novos, ⏩{category_existing} existentes (pulados)")
                     
                 except Exception as e:
                     skipped_count += 1
-                    logger.error(f"❌ Erro na categoria {category_name}: {e}")
+                    logger.error(f" Erro na categoria {category_name}: {e}")
                     db.session.rollback()  # Rollback apenas desta categoria
                     continue
             
             # Estatísticas 
-            total_processed = total_added + total_updated
-            success_rate = (total_processed / (total_processed + skipped_count)) * 100 if (total_processed + skipped_count) > 0 else 0
-            
-            logger.info(f"""
-SCRAPING COM OFFSET COMPLETO!
-📊 Estatísticas:
-   •  Categorias processadas: {processed_categories}/{len(categories_to_process)}
-   •  Novos livros adicionados: {total_added}
-   •  Livros atualizados: {total_updated}
-   •  Itens pulados: {skipped_count}
-   •  Taxa de sucesso: {success_rate:.1f}%
-   •  Total no banco: {Book.query.count()} livros
-   •  Offset usado: {offset}
-   •  Limite: {max_categories or 'nenhum'}
-            """)
+            total_books_processed = len(categories_to_process) * 20  # Estimativa
+            success_rate = (total_added / total_books_processed) * 100 if total_books_processed > 0 else 0
             
     except Exception as e:
         db.session.rollback()
