@@ -1,27 +1,32 @@
+import os
+import logging
 import click
 from flask.cli import with_appcontext
-from app.services.scraper import BookScraper
 from app.models.book import Book, db
-import logging
-from datetime import datetime, timezone
+from app.services.scraper import BookScraper
 
 logger = logging.getLogger(__name__)
 
 @click.command('scrape-books')
-@click.option('--max-categories', default=None, type=int, help='Limitar categorias para teste')
-@click.option('--clean', is_flag=True, default=False, help='Limpar banco antes (modo desenvolvimento)')
+@click.option('--max-categories', default=None, type=int, help='Limitar categorias pra teste')
+@click.option('--clean', is_flag=True, default=False, help='Limpar banco antes (só no RAILWAY)')
 @with_appcontext
 def scrape_books_command(max_categories, clean):
-    """Comando para popular o banco """
+    """Comando pra popular o banco - EXECUTAR APENAS NO RAILWAY"""
     try:
-        logger.info("Iniciando scraping de livros...")
+        if not os.environ.get('RAILWAY_ENVIRONMENT') and not os.environ.get('RAILWAY_SERVICE_NAME'):
+            logger.error(" ERRO: Scraping deve ser executado APENAS no ambiente Railway")
+            logger.error("   Comando correto: railway run flask scrape-books")
+            raise click.ClickException("Scraping bloqueado localmente - execute no Railway")
+        
+        logger.info("Ambiente Railway detectado - Iniciando scraping...")
         
         scraper = BookScraper()
         books_data = scraper.get_all_books(max_categories=max_categories)
         
         if clean:
-            # em dev Limpeza completa
-            logger.info("Modo desenvolvimento - limpando banco...")
+            # APENAS NO RAILWAY
+            logger.info("Modo limpeza - removendo todos os livros...")
             deleted_count = Book.query.delete()
             added_count = 0
             
@@ -31,10 +36,10 @@ def scrape_books_command(max_categories, clean):
                 added_count += 1
             
             db.session.commit()
-            logger.info(f"Desenvolvimento: {deleted_count} removidos, {added_count} adicionados")
+            logger.info(f"Limpeza completa: {deleted_count} removidos, {added_count} adicionados")
             
         else:
-            # prod - usando Upsert
+            # PRODUÇÃO - usando Upsert
             logger.info("Atualizando dados existentes...")
             updated_count = 0
             added_count = 0
@@ -49,7 +54,7 @@ def scrape_books_command(max_categories, clean):
                     ).first()
                     
                     if existing_book:
-                        # atualizar livro existente
+                        # ATUALIZA livro existente
                         existing_book.price = book_data['price']
                         existing_book.rating = book_data['rating']
                         existing_book.availability = book_data['availability']
@@ -58,9 +63,10 @@ def scrape_books_command(max_categories, clean):
                         updated_count += 1
                         
                         if i % 50 == 0:  # Log a cada 50 atualizações
-                            logger.info(f" Progresso: {i}/{len(books_data)}...")
+                            logger.info(f"📦 Progresso: {i}/{len(books_data)}...")
                             
                     else:
+                        # ➕ ADICIONA novo livro
                         book = Book(**book_data)
                         db.session.add(book)
                         added_count += 1
@@ -72,22 +78,22 @@ def scrape_books_command(max_categories, clean):
             
             db.session.commit()
             
-            # Estatísticas 
+            # 📊 Estatísticas 
             total_processed = len(books_data)
             success_rate = ((updated_count + added_count) / total_processed) * 100
             
             logger.info(f"""
-                        SCRAPING PRODUÇÃO COMPLETO!
-                        📊 Estatísticas:
-                           •  Livros processados: {total_processed}
-                           •  Novos livros: {added_count}
-                           •  Livros atualizados: {updated_count}
-                           •  Livros pulados: {skipped_count}
-                           •  Taxa de sucesso: {success_rate:.1f}%
-                           •  Total no banco: {Book.query.count()} livros
-                        """)
+🎊 SCRAPING PRODUÇÃO COMPLETO!
+📊 Estatísticas:
+   •  Livros processados: {total_processed}
+   •  Novos livros adicionados: {added_count}
+   •  Livros atualizados: {updated_count}
+   •  Livros pulados: {skipped_count}
+   •  Taxa de sucesso: {success_rate:.1f}%
+   •  Total no banco: {Book.query.count()} livros
+            """)
             
     except Exception as e:
         db.session.rollback()
-        logger.error(f" ERRO no scraping: {e}")
+        logger.error(f"❌ ERRO no scraping: {e}")
         raise click.ClickException(f"Scraping falhou: {e}")
