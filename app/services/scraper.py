@@ -30,12 +30,11 @@ class BookScraper:
             self.logger.addHandler(handler)
             self.logger.setLevel(logging.INFO)
         
-        self.books_data = []
         self.logger.info(" >>> BookScraper inicializado com sucesso")
 
     def get_book_description(self, url):
         """
-        Obtém a descrição do livro (limitando a 500 caracteres - Todo ver depois)
+        Obtém a descrição do livro (limitando a 500 caracteres)
         """
         try:
             response = self.session.get(url, headers=self.headers, timeout=15)
@@ -82,8 +81,12 @@ class BookScraper:
             self.logger.error(f"Erro ao obter categorias: {e}")
             return {}
 
-    def scrape_category(self, category_name, category_url):
-        """Faz scraping de todos os livros de uma categoria"""
+    def scrape_single_category(self, category_name, category_url):
+        """
+        NOVO MÉTODO: Faz scraping de UMA categoria específica
+        Retorna lista de livros apenas desta categoria
+        """
+        books_data = []
         try:
             self.logger.info(f"Scraping categoria: {category_name}")
             page_url = category_url
@@ -99,7 +102,7 @@ class BookScraper:
                 for book in books:
                     book_data = self.scrape_book_details(book, category_name)
                     if book_data:
-                        self.books_data.append(book_data)
+                        books_data.append(book_data)
                 
                 # Verifica se há próxima página
                 next_button = soup.select_one('li.next a')
@@ -112,6 +115,9 @@ class BookScraper:
                     
         except Exception as e:
             self.logger.error(f"Erro ao fazer scraping da categoria {category_name}: {e}")
+        
+        self.logger.info(f"✅ {category_name}: {len(books_data)} livros coletados")
+        return books_data
 
     def scrape_book_details(self, book_element, category_name):
         """Extrai detalhes de um livro individual com URL corrigida"""
@@ -121,7 +127,7 @@ class BookScraper:
             if not book_link:
                 return None
 
-            # CORREÇÃO: Lidar corretamente com URLs relativas
+            # CORREÇÃO: Lidar com URLs relativas
             book_relative_url = book_link['href']
             while book_relative_url.startswith('../'):
                 book_relative_url = book_relative_url[3:]
@@ -148,7 +154,7 @@ class BookScraper:
 
             # Rating - converte texto para número
             rating_element = book_element.select_one('p.star-rating')
-            rating = 0  
+            rating = 0  # Default
             if rating_element:
                 rating_classes = rating_element.get('class', [])
                 for cls in rating_classes:
@@ -186,10 +192,10 @@ class BookScraper:
         
     def get_all_books(self, max_categories=None):
         """
+        MÉTODO LEGADO - Para uso no comando manual
         Faz scraping de todos os livros de todas as categorias
-        max_categories: limite para teste (None = todas)
         """
-        self.books_data = []  # Reset dos dados
+        books_data = []
         
         categories = self.get_categories()
         
@@ -202,16 +208,17 @@ class BookScraper:
         
         for i, (category_name, category_url) in enumerate(categories.items(), 1):
             self.logger.info(f"📦 Processando categoria {i}/{total_categories}: {category_name}")
-            self.scrape_category(category_name, category_url)
+            category_books = self.scrape_single_category(category_name, category_url)
+            books_data.extend(category_books)
             time.sleep(2)  # Rate limiting entre categorias
             
         # Estatísticas finais
-        total_books = len(self.books_data)
-        with_desc = len([b for b in self.books_data if "Descrição não disponível" not in b['description']])
+        total_books = len(books_data)
+        with_desc = len([b for b in books_data if "Descrição não disponível" not in b['description']])
         success_rate = (with_desc / total_books) * 100 if total_books else 0
         
         self.logger.info(f"🎊 SCRAPING COMPLETO!")
         self.logger.info(f"📊 Total de livros: {total_books}")
         self.logger.info(f"📈 Taxa de sucesso: {success_rate:.1f}%")
             
-        return self.books_data
+        return books_data
