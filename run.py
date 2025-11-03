@@ -9,7 +9,7 @@ app = create_app()
 
 with app.app_context():
     db.create_all()
-    print(">>> Tabelas criadas - VERIFICANDO SCRAPING AUTOMÁTICO")
+    print(">>> ✅ Tabelas criadas - VERIFICANDO SCRAPING AUTOMÁTICO")
 
     from app.models.book import Book
     from app.services.scraper import BookScraper
@@ -17,8 +17,8 @@ with app.app_context():
     book_count = Book.query.count()
     print(f">>> Livros na base: {book_count}")
     
-    if book_count < 100:
-        print(">>> Iniciando scraping automático (COMMIT POR CATEGORIA)...")
+    if book_count < 300:
+        print(">>> 🚀 Iniciando scraping automático (MODO RÁPIDO - SEM ATUALIZAÇÃO)...")
         
         try:
             scraper = BookScraper()
@@ -28,12 +28,15 @@ with app.app_context():
             print(f">>> 📂 Encontradas {len(categories)} categorias")
             
             total_added = 0
-            total_updated = 0
+            total_existing = 0
             processed_categories = 0
             
-            # Processa UMA categoria por vez, com COMMIT após cada
             for i, (category_name, category_url) in enumerate(categories.items(), 1):
-                print(f">>> 🎯 [{i}/{len(categories)}] Processando: {category_name}")
+                if processed_categories >= 8:  # ⬇Limite menor para evitar timeout
+                    print(f">>> ⏹️  Limite de segurança: {processed_categories} categorias processadas")
+                    break
+                    
+                print(f">>>  [{i}/{len(categories)}] Processando: {category_name}")
                 
                 try:
                     # Scraping apenas desta categoria
@@ -43,9 +46,8 @@ with app.app_context():
                         print(f">>>   ⏩ {category_name}: Nenhum livro - pulando")
                         continue
                     
-                    # UPSERT dos livros desta categoria
                     category_added = 0
-                    category_updated = 0
+                    category_existing = 0
                     
                     for book_data in category_books:
                         try:
@@ -56,45 +58,40 @@ with app.app_context():
                             ).first()
                             
                             if existing_book:
-                                # Atualiza
-                                existing_book.price = book_data['price']
-                                existing_book.rating = book_data['rating']
-                                existing_book.availability = book_data['availability']
-                                existing_book.image_url = book_data.get('image_url', '')
-                                existing_book.description = book_data['description']
-                                category_updated += 1
+                                # LIVRO JÁ EXISTE - NÃO ATUALIZA!
+                                category_existing += 1
                             else:
-                                # Adiciona novo
+                                # ADICIONA NOVO livro
                                 book = Book(**book_data)
                                 db.session.add(book)
                                 category_added += 1
                                 
                         except Exception as e:
-                            print(f">>>   ⚠️  Erro no livro: {e}")
+                            print(f">>>    Erro no livro: {e}")
                             continue
                     
                     # COMMIT APÓS CADA CATEGORIA
                     db.session.commit()
                     
                     total_added += category_added
-                    total_updated += category_updated
+                    total_existing += category_existing
                     processed_categories += 1
                     
-                    print(f">>>   ✅ {category_name}: +{category_added} novos, ↗{category_updated} atualizados")
+                    print(f">>>   ✅ {category_name}: +{category_added} novos, ⏩{category_existing} existentes (pulados)")
                     
-                    # Pequena pausa entre categorias
-                    time.sleep(1)
+                    # PAUSA MENOR
+                    time.sleep(0.5)
                     
                 except Exception as e:
-                    print(f">>>   Erro na categoria {category_name}: {e}")
-                    db.session.rollback()  # Rollback apenas desta categoria
+                    print(f">>>  Erro na categoria {category_name}: {e}")
+                    db.session.rollback()
                     continue
             
             final_count = Book.query.count()
-            print(f">>> SCRAPING INCREMENTAL COMPLETO!")
+            print(f">>> SCRAPING RÁPIDO COMPLETO!")
             print(f">>> Categorias processadas: {processed_categories}/{len(categories)}")
-            print(f">>> Novos livros: {total_added}")
-            print(f">>> Atualizados: {total_updated}")
+            print(f">>> NOVOS livros: {total_added}")
+            print(f">>> Existente (pulados): {total_existing}")
             print(f">>> Total na base: {final_count}")
             
         except Exception as e:
