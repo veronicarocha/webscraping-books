@@ -17,7 +17,7 @@ with app.app_context():
     book_count = Book.query.count()
     print(f">>> Livros na base: {book_count}")
     
-    if book_count < 200:
+    if book_count < 230:
         print(">>> Iniciando scraping automático (COMMIT POR CATEGORIA)...")
         
         try:
