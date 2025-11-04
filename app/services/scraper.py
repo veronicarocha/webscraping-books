@@ -37,7 +37,7 @@ class BookScraper:
         Obtém a descrição do livro (limitando a 500 caracteres)
         """
         try:
-            response = self.session.get(url, headers=self.headers, timeout=15)
+            response = self.session.get(url, headers=self.headers, timeout=10)
             response.raise_for_status()
             
             soup = BeautifulSoup(response.content, 'html.parser')

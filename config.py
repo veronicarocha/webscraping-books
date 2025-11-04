@@ -1,33 +1,24 @@
 from dotenv import load_dotenv
-load_dotenv()  # Carrega variáveis do .env
-
+load_dotenv() 
 import os
 from datetime import timedelta
 from urllib.parse import urlparse
 
 class Config:
-    # fallback para desenvolvimento
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-key-change-in-production')  
     
     @staticmethod
     def get_database_url():
-        """
-        Retorna a URL do banco correta para cada ambiente
-        """
-        # Verifica se está no Railway
-        is_railway = os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_SERVICE_NAME')
-        
-        if is_railway:
-            database_url = os.environ.get('DATABASE_URL')
-            if database_url and database_url.startswith('postgres://'):
-                database_url = database_url.replace('postgres://', 'postgresql://', 1)
-            return database_url
-        else:
-            public_db_url = os.environ.get('DATABASE_URL')
-            if public_db_url and public_db_url.startswith('postgres://'):
-                public_db_url = public_db_url.replace('postgres://', 'postgresql://', 1)
-            return public_db_url or 'sqlite:///books.db'
+        url_publica = os.environ.get('DATABASE_URL_PUBLIC')
+        if url_publica:
+            return url_publica
+            
+        url_ambiente = os.environ.get('DATABASE_URL')
+        if url_ambiente:
+            return url_ambiente
+            
+        raise ValueError("Nenhuma DATABASE_URL configurada")
     
     SQLALCHEMY_DATABASE_URI = get_database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -63,12 +54,10 @@ class Config:
             except Exception as e:
                 return f"Database configurado (erro ao parsear: {e})"
 
-# Log de configuração (FORA da classe)
 env = Config.check_environment()
 print(f" >>> Modo: {env}")
 print(f" >>> Database: {Config.get_db_info()}")
 
-# Debug adicional
 if "local" in env.lower():
     db_url = Config.SQLALCHEMY_DATABASE_URI
     if db_url and "ballast.proxy.rlwy.net" in db_url:
