@@ -1,3 +1,4 @@
+import sys
 from dotenv import load_dotenv
 load_dotenv() 
 import os
@@ -10,6 +11,9 @@ class Config:
     
     @staticmethod
     def get_database_url():
+        if os.environ.get('GITHUB_ACTIONS') == 'true':
+            return 'sqlite:///:memory:'
+            
         url_publica = os.environ.get('DATABASE_URL_PUBLIC')
         if url_publica:
             return url_publica
@@ -17,6 +21,9 @@ class Config:
         url_ambiente = os.environ.get('DATABASE_URL')
         if url_ambiente:
             return url_ambiente
+            
+        if 'pytest' in sys.modules or 'unittest' in sys.modules:
+            return 'sqlite:///:memory:'
             
         raise ValueError("Nenhuma DATABASE_URL configurada")
     
