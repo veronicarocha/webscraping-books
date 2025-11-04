@@ -2,14 +2,20 @@
 
 ## 📖 Descrição
 API REST completa para consulta, gestão e recomendação de livros com sistema de machine learning integrado. Desenvolvida com arquitetura modular e escalável, incluindo monitoramento em tempo real.
+O projeto é composto por um pipeline completo, que vai desde a ingestão e raspagem de dados (scraping) até a exposição dos dados via API pública, com monitoramento e métricas em Streamlit.
 
 ## Dados produtivos~
-URL da aplicação criada no Railway:
+
+**URL DA APLICAÇÃO:**
 
 https://web-production-962ea.up.railway.app
 
-Ou apontando para rota específica:
+Apontando para rota específica:
 https://web-production-962ea.up.railway.app/api/v1/health
+
+
+**URL DO DASHBOARD:**
+https://streamlit-dashboard-production-f9ea.up.railway.app
 
 
 ## 🏗️ Arquitetura
@@ -126,9 +132,84 @@ Acesse http://localhost:8501 para visualizar:
     - Estatísticas por endpoint
 
 
-### 8 . Plano Arquitetural 
+### 8. Plano Arquitetural – Book API
+
+<div>
+ <img src="resourses/plano-arquitetural.png" width="500" height="700" alt="desenho_arquitetura" /> 
+</div>
+
+
+
+
+## 🧩 Arquitetura do Sistema
+
+| Componente | Descrição |
+|-------------|------------|
+| **Scraper (Python)** | Executa a raspagem do site e coleta dados atualizados dos livros. Pode ser disparado manualmente ou automaticamente. |
+| **ETL / Transformação** | Processa, limpa e estrutura os dados antes de salvar no banco de dados PostgreSQL. |
+| **Banco de Dados (PostgreSQL)** | Armazena as informações dos livros (id, título, preço, rating, categoria, etc). |
+| **API Flask** | Fornece endpoints RESTful para consulta, análise e operações sobre os dados. |
+| **Painel Streamlit** | Exibe métricas de uso, estatísticas de livros e monitora a saúde das rotas da API. |
+
 
 ### 9. Documentação das rotas da API
 
+Collection para testes no POSTMAN disponivel no projeto
+
+# CATÁLOGO DE ENDPOINTS
+## 🔧 CORE ENDPOINTS
+| Método	| Rota 					| 	Descrição |
+|---------|---------------|------------|
+| GET	| /api/v1/health			|Health check da API |
+| POST	| /api/v1/scraping/trigger	|Disparar scraping manual|
+
+## 📚 BOOKS ENDPOINTS
+| Método	| Rota                    |	Descrição                   |
+|---------|------------------------|-----------------------------|
+| GET |	/api/v1/books			      	| Listar todos os livros          |
+| GET |	/api/v1/books/<int:id>		| Detalhes de um livro específico |
+| GET |	/api/v1/books/search		| Buscar livros                   |
+| GET |	/api/v1/books/top-rated		| Livros mais bem avaliados       |
+| GET |	/api/v1/books/price-range	| Livros por faixa de preço       |
+
+## 🏷️ CATEGORIES ENDPOINTS
+| Método| 	Rota					| Descrição						|
+|---------|---------------|---------------------|
+| GET	| /api/v1/categories		| Listar todas as categorias	|
+| GET	| /api/v1/stats/categories	| Estatísticas por categoria	|
+
+## 📊 STATS ENDPOINTS
+| Método |	Rota	        | Descrição |
+|---------|---------------|------------|
+| GET	 | /api/v1/stats/overview	|Visão geral das estatísticas|
+
+## 🔐 AUTH ENDPOINTS
+| Método| 	Rota				| Descrição					|
+|---------|---------------|------------|
+| POST	| /api/v1/auth/login	| Login e obtenção de token |
+| POST	| /api/v1/auth/refresh	| Refresh do token JWT      |
+
+## 🤖 ML ENDPOINTS
+| Método| 	Rota					| Descrição						|
+|---------|---------------|------------|
+| GET	| /api/v1/ml/features		| Features para machine learning|
+| GET	| /api/v1/ml/training-data	| Dados de treinamento			|
+| GET	| /api/v1/ml/predictions	| Previsões do modelo			|
+
+## 🐛 DEBUG ENDPOINTS
+| Método| 	Rota				| Descrição			|
+|---------|---------------|------------|
+| GET	| /api/v1/debug/logs	| Acessar logs da API  |
+
+
 ### 10 . Exemplos de chamadas com requests/responses
- Instruções para execução. 
+
+Para acesso à documentação acesse: https://web-production-962ea.up.railway.app/apidocs/#/
+
+
+## 11. Considerações de Manutenção e Escalabilidade
+  - O scraping pode ser agendado via cron job ou Airflow (futuro).
+  - Implementar um sistema de autenticação JWT
+  - A API é desacoplada do processo de ingestão, podendo escalar separadamente.
+  - O Streamlit pode ser hospedado independentemente, consumindo a API por HTTPS.
+  - Logs e métricas podem ser adicionados (Prometheus + Grafana).
