@@ -3,6 +3,7 @@ from flask_restful import Api
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flasgger import Swagger
+from app.api.debug.routes import DebugLogs
 from app.models.book import db
 from config import Config
 
@@ -82,5 +83,8 @@ def create_app():
     api.add_resource(MLFeatures, '/ml/features')
     api.add_resource(TrainingData, '/ml/training-data')
     api.add_resource(Predictions, '/ml/predictions')
+
+    # Debug endpoints
+    api.add_resource(DebugLogs, '/debug/logs')
     
     return app

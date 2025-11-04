@@ -4,8 +4,11 @@
 API REST completa para consulta, gestão e recomendação de livros com sistema de machine learning integrado. Desenvolvida com arquitetura modular e escalável, incluindo monitoramento em tempo real.
 
 ## Dados produtivos~
-A url da aplicação criada no Railway é :
+URL da aplicação criada no Railway:
+
 https://web-production-962ea.up.railway.app
+
+Ou apontando para rota específica:
 https://web-production-962ea.up.railway.app/api/v1/health
 
 
@@ -121,3 +124,11 @@ Acesse http://localhost:8501 para visualizar:
     - Gráficos de performance
     - Logs da API
     - Estatísticas por endpoint
+
+
+### 8 . Plano Arquitetural 
+
+### 9. Documentação das rotas da API
+
+### 10 . Exemplos de chamadas com requests/responses
+ Instruções para execução. 

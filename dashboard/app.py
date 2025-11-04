@@ -102,39 +102,33 @@ def fetch_corrected_data():
         return {'books': [], 'categories': [], 'stats': {}}
 
 def load_api_logs():
-    """Carrega e processa logs da API"""
+    """Carrega e processa logs da API via endpoint"""
     logs = []
     try:
-        possible_paths = [
-            os.path.join('logs', 'api_monitor.log'),
-            os.path.join('..', 'logs', 'api_monitor.log'),
-            os.path.join(os.path.dirname(__file__), 'logs', 'api_monitor.log'),
-        ]
+        base_url = get_api_base_url()
+        response = requests.get(f"{base_url}/api/v1/debug/logs?limit=1000", timeout=10)
         
-        for log_path in possible_paths:
-            if os.path.exists(log_path):
-                with open(log_path, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        if line.strip():
-                            try:
-                                log_data = json.loads(line.strip())
-                                processed_log = {
-                                    'timestamp': log_data.get('timestamp'),
-                                    'level': log_data.get('level'),
-                                    'module': log_data.get('module'),
-                                    'endpoint': log_data.get('message', {}).get('endpoint'),
-                                    'path': log_data.get('message', {}).get('path'),
-                                    'status_code': log_data.get('message', {}).get('status_code'),
-                                    'processing_time': log_data.get('message', {}).get('processing_time_seconds'),
-                                    'method': log_data.get('message', {}).get('method'),
-                                    'user_agent': log_data.get('message', {}).get('user_agent'),
-                                    'ip_address': log_data.get('message', {}).get('ip_address'),
-                                    'message': f"{log_data.get('message', {}).get('method', '')} {log_data.get('message', {}).get('path', '')} - {log_data.get('message', {}).get('status_code', '')}"
-                                }
-                                logs.append(processed_log)
-                            except:
-                                continue
-                break
+        if response.status_code == 200:
+            logs_data = response.json()
+            
+            for log_data in logs_data.get('logs', []):
+                processed_log = {
+                    'timestamp': log_data.get('timestamp'),
+                    'level': log_data.get('level'),
+                    'module': log_data.get('module'),
+                    'endpoint': log_data.get('message', {}).get('endpoint'),
+                    'path': log_data.get('message', {}).get('path'),
+                    'status_code': log_data.get('message', {}).get('status_code'),
+                    'processing_time': log_data.get('message', {}).get('processing_time_seconds'),
+                    'method': log_data.get('message', {}).get('method'),
+                    'user_agent': log_data.get('message', {}).get('user_agent'),
+                    'ip_address': log_data.get('message', {}).get('ip_address'),
+                    'message': f"{log_data.get('message', {}).get('method', '')} {log_data.get('message', {}).get('path', '')} - {log_data.get('message', {}).get('status_code', '')}"
+                }
+                logs.append(processed_log)
+        else:
+            st.warning(f"Erro ao buscar logs: {response.status_code}")
+            
     except Exception as e:
         st.warning(f"Logs não disponíveis: {e}")
     
