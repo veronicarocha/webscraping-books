@@ -135,7 +135,7 @@ Acesse http://localhost:8501 para visualizar:
 ### 8. Plano Arquitetural – Book API
 
 <div>
- <img src="resourses/plano-arquitetural.png" width="500" height="700" alt="desenho_arquitetura" /> 
+ <img src="resourses/desenho-aplicacao.png" width="800" height="700" alt="desenho_arquitetura" /> 
 </div>
 
 
