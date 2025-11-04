@@ -1,9 +1,11 @@
 from urllib import request
 from flask_restful import Resource
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from flasgger import swag_from
+from flask import request
 from app.models.book import Book
 import logging
+
 
 class MLFeatures(Resource):
     @jwt_required()
@@ -109,11 +111,14 @@ class TrainingData(Resource):
         except Exception as e:
             return {'error': str(e)}, 500
 
+
+logger = logging.getLogger(__name__)
+
 class Predictions(Resource):
     
     @jwt_required()
     @swag_from({
-        'tags': ['ML'],
+        'tags': ['ml'],
         'security': [{'Bearer Auth': []}],
         'parameters': [
             {
@@ -148,29 +153,33 @@ class Predictions(Resource):
         'responses': {
             200: {
                 'description': 'Predições geradas com sucesso',
-                'schema': {
-                    'type': 'object',
-                    'properties': {
-                        'predictions': {
-                            'type': 'array',
-                            'items': {
-                                'type': 'object',
-                                'properties': {
-                                    'book_id': {'type': 'integer'},
-                                    'title': {'type': 'string'},
-                                    'predicted_rating': {'type': 'number'},
-                                    'recommendation_score': {'type': 'number'},
-                                    'confidence': {'type': 'number'},
-                                    'original_rating': {'type': 'integer'},
-                                    'category': {'type': 'string'}
-                                }
+                'examples': {  
+                    'application/json': {
+                        'predictions': [
+                            {
+                                'book_id': 1,
+                                'title': 'Book Title',
+                                'predicted_rating': 4.5,
+                                'recommendation_score': 0.85,
+                                'confidence': 0.8,
+                                'original_rating': 4,
+                                'category': 'Fiction'
                             }
-                        },
-                        'model_version': {'type': 'string'},
-                        'message': {'type': 'string'},
-                        'user_id': {'type': 'string'},
-                        'total_books': {'type': 'integer'},
-                        'user_authenticated': {'type': 'string'}
+                        ],
+                        'model_version': '1.1-enhanced',
+                        'message': 'Predições geradas para 3 livros',
+                        'user_id': 'user_123',
+                        'total_books': 3,
+                        'user_authenticated': 'admin:admin',
+                        'top_recommendation': {
+                            'book_id': 1,
+                            'title': 'Book Title', 
+                            'predicted_rating': 4.5,
+                            'recommendation_score': 0.85,
+                            'confidence': 0.8,
+                            'original_rating': 4,
+                            'category': 'Fiction'
+                        }
                     }
                 }
             },
@@ -179,6 +188,9 @@ class Predictions(Resource):
             },
             400: {
                 'description': 'Dados de entrada inválidos'
+            },
+            500: {
+                'description': 'Erro interno do servidor'
             }
         }
     })
@@ -237,6 +249,7 @@ class Predictions(Resource):
                     'Travel': 0.1
                 }.get(category, 0.1)
                 
+                # Bônus por rating original
                 rating_bonus = (original_rating - 3) * 0.2
                 
                 # Cálculo da predição
