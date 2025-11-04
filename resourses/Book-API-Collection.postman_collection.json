@@ -1,0 +1,634 @@
+{
+	"info": {
+		"_postman_id": "79d3bf7f-c299-4e87-a929-0270a7d8532c",
+		"name": "Book API - Complete Collection",
+		"description": "API completa para gerenciamento de livros, categorias, estatísticas e machine learning",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "2387457"
+	},
+	"item": [
+		{
+			"name": "🔧 CORE ENDPOINTS",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/{{api_version}}/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"{{api_version}}",
+								"health"
+							]
+						},
+						"description": "Verifica se a API está funcionando corretamente"
+					},
+					"response": []
+				},
+				{
+					"name": "Trigger Scraping Manual",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/{{api_version}}/scraping/trigger",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"{{api_version}}",
+								"scraping",
+								"trigger"
+							]
+						},
+						"description": "Dispara o processo de scraping manualmente (requer autenticação)"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints principais do sistema"
+		},
+		{
+			"name": "📚 BOOKS ENDPOINTS",
+			"item": [
+				{
+					"name": "Listar Todos os Livros",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/{{api_version}}/books?per_page=10&page=1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"{{api_version}}",
+								"books"
+							],
+							"query": [
+								{
+									"key": "per_page",
+									"value": "10",
+									"description": "Quantidade de livros por página"
+								},
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Página atual"
+								}
+							]
+						},
+						"description": "Retorna lista paginada de todos os livros"
+					},
+					"response": []
+				},
+				{
+					"name": "Detalhes do Livro por ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/{{api_version}}/books/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"{{api_version}}",
+								"books",
+								"1"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "ID do livro"
+								}
+							]
+						},
+						"description": "Retorna detalhes completos de um livro específico"
+					},
+					"response": []
+				},
+				{
+					"name": "Buscar Livros [CATG e TITULO]",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/{{api_version}}/books/search?q=python&category=Fiction&title=Forever",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"{{api_version}}",
+								"books",
+								"search"
+							],
+							"query": [
+								{
+									"key": "q",
+									"value": "python",
+									"description": "Termo de busca"
+								},
+								{
+									"key": "category",
+									"value": "Fiction",
+									"description": "Filtrar por categoria (opcional)"
+								},
+								{
+									"key": "title",
+									"value": "Forever",
+									"description": "Filtrar por um titulo (opcional)"
+								}
+							]
+						},
+						"description": "Busca livros por termo e filtros opcionais"
+					},
+					"response": []
+				},
+				{
+					"name": "Top Livros Avaliados",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/{{api_version}}/books/top-rated?limit=10",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"{{api_version}}",
+								"books",
+								"top-rated"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10",
+									"description": "Quantidade de livros a retornar"
+								}
+							]
+						},
+						"description": "Retorna os livros mais bem avaliados"
+					},
+					"response": []
+				},
+				{
+					"name": "Livros por Faixa de Preço",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/{{api_version}}/books/price-range?min=10&max=16",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"{{api_version}}",
+								"books",
+								"price-range"
+							],
+							"query": [
+								{
+									"key": "min",
+									"value": "10"
+								},
+								{
+									"key": "max",
+									"value": "16"
+								}
+							]
+						},
+						"description": "Retorna livros dentro de uma faixa de preço específica"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para gerenciamento de livros"
+		},
+		{
+			"name": "🏷️ CATEGORIES ENDPOINTS",
+			"item": [
+				{
+					"name": "Listar Todas as Categorias",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/{{api_version}}/categories",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"{{api_version}}",
+								"categories"
+							]
+						},
+						"description": "Retorna todas as categorias disponíveis"
+					},
+					"response": []
+				},
+				{
+					"name": "Estatísticas por Categoria",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/{{api_version}}/stats/categories",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"{{api_version}}",
+								"stats",
+								"categories"
+							]
+						},
+						"description": "Retorna estatísticas detalhadas por categoria"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para gerenciamento de categorias"
+		},
+		{
+			"name": "📊 STATS ENDPOINTS",
+			"item": [
+				{
+					"name": "Visão Geral das Estatísticas",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/{{api_version}}/stats/overview",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"{{api_version}}",
+								"stats",
+								"overview"
+							]
+						},
+						"description": "Retorna visão geral completa das estatísticas do sistema"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints de estatísticas e analytics"
+		},
+		{
+			"name": "🔐 AUTH ENDPOINTS",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const jsonData = pm.response.json();\r",
+									"\r",
+									"if (jsonData && jsonData.access_token) {\r",
+									"    pm.globals.set(\"token\", jsonData.access_token);\r",
+									"    pm.globals.set(\"refresh_token\", jsonData.refresh_token);\r",
+									"   // console.log(\"Token armazenado globalmente: \" + jsonData.access_token);\r",
+									"} else {\r",
+									"    console.log(\"Token não encontrado na resposta.\");\r",
+									"}"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"admin\",\n  \"password\": \"senha-admin\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/{{api_version}}/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"{{api_version}}",
+								"auth",
+								"login"
+							]
+						},
+						"description": "Realiza login e obtém token JWT"
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{refresh_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://web-production-962ea.up.railway.app/api/v1/auth/refresh",
+							"protocol": "https",
+							"host": [
+								"web-production-962ea",
+								"up",
+								"railway",
+								"app"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"refresh"
+							]
+						},
+						"description": "Renova o token JWT atual"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints de autenticação e autorização"
+		},
+		{
+			"name": "🤖 ML ENDPOINTS",
+			"item": [
+				{
+					"name": "ML Features",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/{{api_version}}/ml/features",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"{{api_version}}",
+								"ml",
+								"features"
+							]
+						},
+						"description": "Retorna features para treinamento de modelos de ML"
+					},
+					"response": []
+				},
+				{
+					"name": "Training Data",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/{{api_version}}/ml/training-data",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"{{api_version}}",
+								"ml",
+								"training-data"
+							]
+						},
+						"description": "Retorna dados formatados para treinamento"
+					},
+					"response": []
+				},
+				{
+					"name": "Predictions",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n        \"user_id\": \"version_check\",\r\n        \"book_features\": [\r\n            {\r\n                \"book_id\": 99,\r\n                \"title\": \"Version Test Book\",\r\n                \"price\": 99.99,\r\n                \"rating\": 5,\r\n                \"category\": \"Test\"\r\n            }\r\n        ]\r\n    }",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/{{api_version}}/ml/predictions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"{{api_version}}",
+								"ml",
+								"predictions"
+							]
+						},
+						"description": "Retorna previsões do modelo de ML"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints de Machine Learning"
+		},
+		{
+			"name": "🐛 DEBUG ENDPOINTS",
+			"item": [
+				{
+					"name": "Acessar Logs da API",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/{{api_version}}/debug/logs?limit=100&format=json&level=INFO",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"{{api_version}}",
+								"debug",
+								"logs"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "100",
+									"description": "Quantidade máxima de logs"
+								},
+								{
+									"key": "format",
+									"value": "json",
+									"description": "Formato de retorno (json/text)"
+								},
+								{
+									"key": "level",
+									"value": "INFO",
+									"description": "Filtrar por nível (INFO/ERROR/WARNING)"
+								}
+							]
+						},
+						"description": "Retorna logs do sistema para debug"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para debug e monitoramento"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{jwt_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"console.log('Iniciando requisição para: ' + pm.request.url);"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Salva o token JWT automaticamente após login",
+					"if (pm.response.code === 200 && pm.request.url.toString().includes('/auth/login')) {",
+					"    var jsonData = pm.response.json();",
+					"    if (jsonData.access_token) {",
+					"        pm.collectionVariables.set('jwt_token', jsonData.access_token);",
+					"        console.log('Token JWT salvo: ' + jsonData.access_token);",
+					"    }",
+					"}",
+					"",
+					"// Testes básicos de resposta",
+					"pm.test(\"Status code is 200\", function () {",
+					"    pm.response.to.have.status(200);",
+					"});",
+					"",
+					"pm.test(\"Response time is acceptable\", function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(1000);",
+					"});"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000",
+			"type": "string",
+			"description": {
+				"content": "URL base da API - altere para produção quando necessário",
+				"type": "text/plain"
+			}
+		},
+		{
+			"key": "api_version",
+			"value": "v1",
+			"type": "string",
+			"description": {
+				"content": "Versão da API",
+				"type": "text/plain"
+			}
+		},
+		{
+			"key": "jwt_token",
+			"value": "",
+			"type": "string",
+			"description": {
+				"content": "Token JWT para autenticação (obtido no login)",
+				"type": "text/plain"
+			}
+		}
+	]
+}
