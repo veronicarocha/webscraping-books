@@ -1,9 +1,11 @@
 from urllib import request
 from flask_restful import Resource
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from flasgger import swag_from
+from flask import request
 from app.models.book import Book
 import logging
+
 
 class MLFeatures(Resource):
     @jwt_required()
