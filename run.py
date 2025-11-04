@@ -9,98 +9,112 @@ app = create_app()
 
 with app.app_context():
     db.create_all()
-    print(">>> ✅ Tabelas criadas - VERIFICANDO SCRAPING AUTOMÁTICO")
+    print(">>> Tabelas criadas - VERIFICANDO SCRAPING INTELIGENTE")
 
     from app.models.book import Book
     from app.services.scraper import BookScraper
     
     book_count = Book.query.count()
-    print(f">>> Livros na base: {book_count}")
     
-    if book_count < 300:
-        print(">>> 🚀 Iniciando scraping automático (MODO RÁPIDO - SEM ATUALIZAÇÃO)...")
+    # Conta categorias únicas existentes
+    categories_count = db.session.query(Book.category).distinct().count()
+    categories_count = categories_count-1
+    
+    print(f">>>  Análise da Base:")
+    print(f">>>  Livros: {book_count}")
+    print(f">>>  Categorias: {categories_count}")
+    
+    TARGET_BOOKS = 1000  # Meta total
+    MAX_TIME_MINUTES = 10  # Tempo máximo pra nao ficar em looping
+    start_time = time.time()
+    
+    # Só executa se NÃO atingiu a meta
+    if book_count < TARGET_BOOKS:
+        print(f">>> INICIANDO SCRAPING INTELIGENTE")
+        print(f">>>   Meta: {TARGET_BOOKS} livros")
+        print(f">>>   Limite: {MAX_TIME_MINUTES} minutos")
+        print(f">>>   Offset: {categories_count} categorias")
         
         try:
             scraper = BookScraper()
+            all_categories = scraper.get_categories()
             
-            # Pega as categorias
-            categories = scraper.get_categories()
-            print(f">>> 📂 Encontradas {len(categories)} categorias")
+            # OFFSET: Pula categorias já processadas
+            categories_to_process = dict(list(all_categories.items())[categories_count:])
+            print(f">>>    📂 Categorias para processar: {len(categories_to_process)}/{len(all_categories)}")
             
             total_added = 0
-            total_existing = 0
-            processed_categories = 0
+            processed_in_this_run = 0
             
-            for i, (category_name, category_url) in enumerate(categories.items(), 1):
-                if processed_categories >= 8:  # ⬇Limite menor para evitar timeout
-                    print(f">>> ⏹️  Limite de segurança: {processed_categories} categorias processadas")
+            for i, (category_name, category_url) in enumerate(categories_to_process.items(), categories_count + 1):
+                # VERIFICAÇÃO DE TEMPO
+                elapsed_minutes = (time.time() - start_time) / 60
+                if elapsed_minutes >= MAX_TIME_MINUTES:
+                    print(f">>> LIMITE DE {MAX_TIME_MINUTES} MINUTOS ATINGIDO")
                     break
-                    
-                print(f">>>  [{i}/{len(categories)}] Processando: {category_name}")
+                
+                # VERIFICAÇÃO DE META
+                current_count = Book.query.count()
+                if current_count >= TARGET_BOOKS:
+                    print(f">>> META DE {TARGET_BOOKS} LIVROS ATINGIDA")
+                    break
+                
+                print(f">>> [{i}/{len(all_categories)}] Processando: {category_name}")
+                print(f">>>    Tempo: {elapsed_minutes:.1f}min | Livros: {current_count}/{TARGET_BOOKS}")
                 
                 try:
-                    # Scraping apenas desta categoria
                     category_books = scraper.scrape_single_category(category_name, category_url)
-                    
-                    if not category_books:
-                        print(f">>>   ⏩ {category_name}: Nenhum livro - pulando")
-                        continue
                     
                     category_added = 0
                     category_existing = 0
                     
                     for book_data in category_books:
-                        try:
-                            # Busca livro existente
-                            existing_book = Book.query.filter_by(
-                                title=book_data['title'],
-                                category=book_data['category']
-                            ).first()
-                            
-                            if existing_book:
-                                # LIVRO JÁ EXISTE - NÃO ATUALIZA!
-                                category_existing += 1
-                            else:
-                                # ADICIONA NOVO livro
-                                book = Book(**book_data)
-                                db.session.add(book)
-                                category_added += 1
-                                
-                        except Exception as e:
-                            print(f">>>    Erro no livro: {e}")
-                            continue
+                        if not Book.query.filter_by(title=book_data['title'], category=category_name).first():
+                            book = Book(**book_data)
+                            db.session.add(book)
+                            category_added += 1
+                        else:
+                            category_existing += 1
                     
-                    # COMMIT APÓS CADA CATEGORIA
                     db.session.commit()
                     
                     total_added += category_added
-                    total_existing += category_existing
-                    processed_categories += 1
+                    processed_in_this_run += 1
                     
-                    print(f">>>   ✅ {category_name}: +{category_added} novos, ⏩{category_existing} existentes (pulados)")
+                    print(f">>> {category_name}: +{category_added} novos,{category_existing} existentes")
                     
-                    # PAUSA MENOR
-                    time.sleep(0.5)
+                    # pausa
+                    time.sleep(1)
                     
                 except Exception as e:
-                    print(f">>>  Erro na categoria {category_name}: {e}")
+                    print(f">>> Erro em {category_name}: {e}")
                     db.session.rollback()
                     continue
             
+            # RELATÓRIO FINAL
             final_count = Book.query.count()
-            print(f">>> SCRAPING RÁPIDO COMPLETO!")
-            print(f">>> Categorias processadas: {processed_categories}/{len(categories)}")
-            print(f">>> NOVOS livros: {total_added}")
-            print(f">>> Existente (pulados): {total_existing}")
-            print(f">>> Total na base: {final_count}")
+            final_categories = db.session.query(Book.category).distinct().count()
+            elapsed_minutes = (time.time() - start_time) / 60
+            
+            print(f">>> SCRAPING  !")
+            print(f">>>    Tempo total: {elapsed_minutes:.1f} minutos")
+            print(f">>>    Categorias processadas: {processed_in_this_run}")
+            print(f">>>    Livros adicionados: {total_added}")
+            print(f">>>    Total na base: {final_count}/{TARGET_BOOKS}")
+            print(f">>>    Categorias totais: {final_categories}")
+            
+            if final_count < TARGET_BOOKS:
+                remaining = TARGET_BOOKS - final_count
+                print(f">>> Faltam {remaining} livros - próximo deploy continuará automaticamente")
             
         except Exception as e:
-            print(f">>> Erro no scraping automático: {e}")
+            print(f">>> Erro no scraping inteligente: {e}")
+    
     else:
-        print(">>> Base já populada - Scraping automático ignorado")
+        print(f">>> Meta atingida: {book_count}/{TARGET_BOOKS} livros")
+        print(f">>> Base completa - Scraping não necessário")
 
 if __name__ == '__main__':
-    print(f">>> Iniciando Book API em modo: {Config.check_environment()}")
+    print(f">>> Iniciando Book API")
     port = int(os.environ.get('PORT', 5000))
-    debug = Config.check_environment() == "desenvolvimento"
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    app.run(host='0.0.0.0', port=port, debug=False)

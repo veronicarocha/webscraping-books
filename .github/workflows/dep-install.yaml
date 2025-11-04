@@ -21,5 +21,18 @@ jobs:
         pip install -r requirements.txt 
         pip install pytest
 
-    - name: Rodar testes com pytest
-      run: pytest
+    - name: Config pra testes
+      run: |
+        echo "GITHUB_ACTIONS=true" >> $GITHUB_ENV
+        echo "SECRET_KEY=test-key-gh-actions" >> $GITHUB_ENV
+        echo "JWT_SECRET_KEY=test-jwt-gh-actions" >> $GITHUB_ENV
+        echo "DATABASE_URL=sqlite:///:memory:" >> $GITHUB_ENV
+        echo "DATABASE_URL_PUBLIC=sqlite:///:memory:" >> $GITHUB_ENV
+
+    - name: Run API tests
+      run: |
+        python tests/test_api.py
+    
+    - name: Run deploy test
+      run: |
+        python tests/test_quick_deploy.py
