@@ -9,7 +9,7 @@ app = create_app()
 
 with app.app_context():
     db.create_all()
-    print(">>> Tabelas criadas - VERIFICANDO SCRAPING INTELIGENTE")
+    print(">>> Tabelas criadas")
 
     from app.models.book import Book
     from app.services.scraper import BookScraper
@@ -25,7 +25,7 @@ with app.app_context():
     print(f">>>  Categorias: {categories_count}")
     
     TARGET_BOOKS = 1000  # Meta total
-    MAX_TIME_MINUTES = 10  # Tempo máximo pra nao ficar em looping
+    MAX_TIME_MINUTES = 15  # Tempo máximo pra nao ficar em looping
     start_time = time.time()
     
     # Só executa se NÃO atingiu a meta

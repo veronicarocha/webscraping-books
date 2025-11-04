@@ -24,7 +24,6 @@ class ScrapingReconciliation:
         self.scraper = scraper
         self.db_session = db_session
         self.discrepancies = []
-        self.comparacao_completa = []
         
     def analisar_conciliação(self):
         logger.info("Iniciando analise de conciliacao")
@@ -39,8 +38,8 @@ class ScrapingReconciliation:
         
         self._mostrar_comparacao_completa(livros_por_categoria_base, livros_por_categoria_site)
         
-        # Análise que CAPTURA edições diferentes
-        self._analisar_discrepancias_com_edicoes(
+        # CORREÇÃO: Análise que inclui TODAS as categorias do site
+        self._analisar_discrepancias_completas(
             categorias_base, 
             categorias_site,
             livros_por_categoria_base,
@@ -84,27 +83,25 @@ class ScrapingReconciliation:
         """Encontra livros com mesmo título mas preços/ratings diferentes"""
         from collections import defaultdict
         livros_por_titulo = defaultdict(list)
-        
+
         for livro in livros:
             titulo = livro['title']
             livros_por_titulo[titulo].append({
-                'url_id': livro['url_id'],
                 'price': livro['price'],
                 'rating': livro['rating'],
                 'availability': livro['availability']
             })
-        
-        # Retorna apenas títulos que têm  edições com diferenças
+
         edicoes_diferentes = {}
         for titulo, edicoes in livros_por_titulo.items():
             if len(edicoes) > 1:
                 # Verifica se há diferenças reais (preço, rating, etc)
                 preços = [ed['price'] for ed in edicoes]
                 ratings = [ed['rating'] for ed in edicoes]
-                
+
                 if len(set(preços)) > 1 or len(set(ratings)) > 1:
                     edicoes_diferentes[titulo] = edicoes
-        
+    
         return edicoes_diferentes
 
     def _scrape_categoria_com_urls(self, categoria_nome, categoria_url):
@@ -139,14 +136,13 @@ class ScrapingReconciliation:
         return livros_detalhados
 
     def _extrair_livro_com_url(self, book_element, categoria_nome):
-        """Extrai livro com URL única para identificar edições diferentes"""
+        """Extrai livro usando apenas campos válidos do modelo Book"""
         try:
-            # URL do livro (chave única)
             book_link = book_element.select_one('h3 a')
             if not book_link:
                 return None
 
-            # Corrige URL
+            # Corrige URL 
             book_relative_url = book_link['href']
             while book_relative_url.startswith('../'):
                 book_relative_url = book_relative_url[3:]
@@ -155,14 +151,14 @@ class ScrapingReconciliation:
                 book_relative_url = f'catalogue/{book_relative_url}'
 
             book_url = urljoin(self.scraper.base_url, book_relative_url)
-            
-            # Extrai ID único da URL
+
+            # Extrai ID único da URL (apenas para comparação interna)
             url_parts = urlparse(book_url)
             path_parts = url_parts.path.split('/')
             livro_id = path_parts[-2] if path_parts[-1] == '' else path_parts[-1]
             livro_id = livro_id.replace('.html', '')
 
-            # Informações básicas
+            # Informações básicas 
             title = book_link.get('title', '').strip()
 
             # Preço
@@ -200,19 +196,17 @@ class ScrapingReconciliation:
                     image_relative_url = f'catalogue/{image_relative_url}'
                 image_url = urljoin(self.scraper.base_url, image_relative_url)
 
-            description = "A ser coletada no salvamento"
-
             return {
                 'title': title,
                 'price': price,
                 'availability': availability,
                 'rating': rating,
-                'description': description,
+                'description': "A ser coletada no salvamento",
                 'category': categoria_nome,
                 'image_url': image_url,
-                'url': book_url,
-                'url_id': livro_id,
-                'chave_unica': f"{title}||{livro_id}||{price}||{rating}"  # Chave única com preço e rating
+                '_internal_url': book_url,
+                '_internal_url_id': livro_id,
+                '_internal_chave_unica': f"{title}||{livro_id}||{price}||{rating}"
             }
 
         except Exception as e:
@@ -282,17 +276,34 @@ class ScrapingReconciliation:
             logger.error(f"Erro ao contar livros por categoria: {e}")
             return defaultdict(int)
 
-    def _analisar_discrepancias_com_edicoes(self, categorias_base, categorias_site, base_counts, site_counts, livros_detalhados_site):
-        """Análise que CAPTURA edições diferentes como livros faltantes"""
+    def _analisar_discrepancias_completas(self, categorias_base, categorias_site, base_counts, site_counts, livros_detalhados_site):
+        """ANÁLISE COMPLETA: Inclui TODAS as categorias do site - CORRIGIDO"""
         
-        for categoria in categorias_base:
+        # CORREÇÃO: Processa TODAS as categorias do site, não só as que estão na base
+        todas_categorias = set(list(categorias_base) + list(categorias_site.keys()))
+        
+        for categoria in sorted(todas_categorias):
             if categoria not in site_counts:
                 continue
                 
             livros_base_count = base_counts.get(categoria, 0)
             livros_site_count = site_counts.get(categoria, 0)
             
-            if livros_site_count > livros_base_count:
+            # CATEGORIA COMPLETAMENTE FALTANTE (0 na base, >0 no site)
+            if livros_base_count == 0 and livros_site_count > 0:
+                logger.info(f"🚨 CATEGORIA COMPLETAMENTE FALTANTE: {categoria}")
+                self.discrepancies.append({
+                    'tipo': 'CATEGORIA_FALTANTE',
+                    'categoria': categoria,
+                    'detalhes': f'CATEGORIA INTEIRA FALTANDO: Base tem 0 livros, site tem {livros_site_count}',
+                    'severidade': 'CRITICA',
+                    'livros_base': 0,
+                    'livros_site': livros_site_count,
+                    'faltantes': livros_site_count
+                })
+            
+            # LIVROS FALTANTES EM CATEGORIA EXISTENTE
+            elif livros_site_count > livros_base_count:
                 faltantes = livros_site_count - livros_base_count
                 
                 # Verifica se são edições diferentes
@@ -307,7 +318,7 @@ class ScrapingReconciliation:
                 self.discrepancies.append({
                     'tipo': 'LIVROS_FALTANTES',
                     'categoria': categoria,
-                    'detalhes': f'Base tem {livros_base_count} livros, site tem {livros_site_count} (faltam {faltantes}) - INCLUI EDIÇÕES DIFERENTES',
+                    'detalhes': f'Base tem {livros_base_count} livros, site tem {livros_site_count} (faltam {faltantes})',
                     'severidade': 'ALTA',
                     'livros_base': livros_base_count,
                     'livros_site': livros_site_count,
@@ -326,81 +337,95 @@ class ScrapingReconciliation:
                 })
 
     def executar_recuperacao(self, max_categorias=10, max_tempo_minutos=30):
-        """Recuperação que CAPTURA todas as edições diferentes"""
-        logger.info("Iniciando recuperacao de dados - CAPTURANDO EDIÇÕES DIFERENTES")
-        
+        """Recuperação COMPLETA - inclui categorias totalmente faltantes"""
+        logger.info("🔄 Iniciando recuperação de dados COMPLETA")
+
         start_time = datetime.now()
         categorias_processadas = 0
-        
+
+        # CORREÇÃO: Inclui CATEGORIA_FALTANTE na recuperação
         categorias_para_recuperar = [
             disc for disc in self.discrepancies 
-            if disc['severidade'] in ['ALTA', 'MEDIA'] 
-            and disc['tipo'] in ['LIVROS_FALTANTES']
+            if disc['severidade'] in ['CRITICA', 'ALTA', 'MEDIA'] 
+            and disc['tipo'] in ['CATEGORIA_FALTANTE', 'LIVROS_FALTANTES']
         ]
+
+        # Ordena por severidade (CRITICA primeiro)
+        categorias_para_recuperar.sort(key=lambda x: {
+            'CRITICA': 0, 'ALTA': 1, 'MEDIA': 2, 'BAIXA': 3
+        }[x['severidade']])
+
+        logger.info(f"📋 {len(categorias_para_recuperar)} categorias para recuperar")
         
-        categorias_para_recuperar.sort(key=lambda x: (
-            x.get('edicoes_diferentes', 0), 
-            x.get('faltantes', 0),
-        ), reverse=True)
-        
-        logger.info(f"{len(categorias_para_recuperar)} categorias para recuperar")
-        
+        # Log das categorias que serão processadas
         for disc in categorias_para_recuperar:
-            edicoes_info = f" ({disc.get('edicoes_diferentes', 0)} edições diferentes)" if disc.get('edicoes_diferentes', 0) > 0 else ""
-            logger.info(f"   {disc['categoria']}: {disc['tipo']} ({disc.get('faltantes', 0)} faltantes{edicoes_info})")
-        
+            tipo_info = "CATEGORIA INTEIRA" if disc['tipo'] == 'CATEGORIA_FALTANTE' else f"{disc['faltantes']} livros"
+            logger.info(f"   🎯 {disc['categoria']}: {tipo_info} ({disc['severidade']})")
+
         for discrepancia in categorias_para_recuperar:
             if (datetime.now() - start_time).total_seconds() > max_tempo_minutos * 60:
-                logger.warning("Tempo maximo de execucao atingido")
+                logger.warning("⏰ Tempo máximo de execução atingido")
                 break
-                
+
             if categorias_processadas >= max_categorias:
-                logger.info("Limite de categorias processadas atingido")
+                logger.info("🎯 Limite de categorias processadas atingido")
                 break
-                
+
             categoria = discrepancia['categoria']
             livros_faltantes = discrepancia.get('faltantes', 0)
-            edicoes_diferentes = discrepancia.get('edicoes_diferentes', 0)
-            
-            logger.info(f"🔄 Recuperando {categoria} ({livros_faltantes} livros faltantes, {edicoes_diferentes} edições diferentes)")
-            
+            tipo = discrepancia['tipo']
+
+            if tipo == 'CATEGORIA_FALTANTE':
+                logger.info(f"🚨 RECUPERANDO CATEGORIA INTEIRA: {categoria} ({livros_faltantes} livros)")
+            else:
+                logger.info(f"📥 Recuperando {categoria} ({livros_faltantes} livros faltantes)")
+
             try:
                 categoria_url = self._encontrar_url_categoria(categoria)
                 if not categoria_url:
-                    logger.error(f"URL nao encontrada para categoria: {categoria}")
+                    logger.error(f"❌ URL não encontrada para categoria: {categoria}")
                     continue
                 
                 # Scraping detalhado
                 books_data = self._scrape_categoria_com_urls(categoria, categoria_url)
-                
+
                 novos_livros = 0
                 edicoes_capturadas = 0
-                
+
                 for book_data in books_data:
                     if self._livro_nao_existe(book_data):
                         # Busca descrição completa apenas para livros novos
                         try:
-                            book_data['description'] = self.scraper.get_book_description(book_data['url'])
+                            book_data['description'] = self.scraper.get_book_description(book_data['_internal_url'])
                         except:
                             book_data['description'] = "Descrição não disponível"
-                        
+
+                        # Remove campos internos antes de salvar
+                        campos_internos = ['_internal_url', '_internal_url_id', '_internal_chave_unica']
+                        for campo in campos_internos:
+                            book_data.pop(campo, None)
+
                         self._salvar_livro(book_data)
                         novos_livros += 1
-                        
+
                         # Verifica se é uma edição diferente
                         livros_mesmo_titulo = self._contar_livros_mesmo_titulo(book_data['title'], categoria)
                         if livros_mesmo_titulo > 1:
                             edicoes_capturadas += 1
-                            logger.info(f"   📚 CAPTUROU EDIÇÃO: '{book_data['title']}' (preço: £{book_data['price']})")
-                
-                logger.info(f"✅ {categoria}: {novos_livros} novos livros salvos ({edicoes_capturadas} edições diferentes)")
+                            logger.info(f"   📚 Edição capturada: '{book_data['title']}' (£{book_data['price']})")
+
+                if tipo == 'CATEGORIA_FALTANTE':
+                    logger.info(f"🎉 CATEGORIA RECUPERADA: {categoria} - {novos_livros} livros salvos")
+                else:
+                    logger.info(f"✅ {categoria}: {novos_livros} novos livros ({edicoes_capturadas} edições)")
+                    
                 categorias_processadas += 1
-                
+
             except Exception as e:
-                logger.error(f" Erro ao recuperar {categoria}: {e}")
+                logger.error(f"❌ Erro ao recuperar {categoria}: {e}")
                 continue
-        
-        logger.info(f" Recuperacao concluida: {categorias_processadas} categorias processadas")
+            
+        logger.info(f"🎉 Recuperação concluída: {categorias_processadas} categorias processadas")
 
     def _contar_livros_mesmo_titulo(self, titulo, categoria):
         """Conta quantos livros com mesmo título existem na categoria"""
@@ -415,48 +440,63 @@ class ScrapingReconciliation:
         return None
     
     def _livro_nao_existe(self, book_data):
-        """Verificação que permite múltiplas edições do mesmo livro"""
+        """Verificação usando apenas campos válidos do modelo Book"""
         from app.models.book import Book
-        
+
         try:
-            # PERMITE múltiplos livros com mesmo título (edições diferentes)
+            # Verificação por título e categoria (campos válidos)
             livro_existente = Book.query.filter_by(
                 title=book_data['title'],
                 category=book_data['category']
-            ).filter(Book.url_id == book_data['url_id']).first()
-            
-            return livro_existente is None
-            
+            ).first()
+
+            # Se não existe, pode salvar
+            if not livro_existente:
+                return True
+
+            # Se existe, verifica se é uma edição diferente (mesmo título, preço/rating diferente)
+            if (livro_existente.price != book_data['price'] or 
+                livro_existente.rating != book_data['rating']):
+                logger.info(f"📚 Edição diferente encontrada: '{book_data['title']}'")
+                logger.info(f"   Base: £{livro_existente.price} ⭐{livro_existente.rating}")
+                logger.info(f"   Site: £{book_data['price']} ⭐{book_data['rating']}")
+                return True
+
+            return False
+        
         except Exception as e:
             logger.error(f"Erro ao verificar livro existente: {e}")
             return True
 
     def _salvar_livro(self, book_data):
         from app.models.book import Book, db
-        
+
         try:
-            novo_livro = Book(
-                title=book_data['title'],
-                price=book_data['price'],
-                rating=book_data['rating'],
-                availability=book_data['availability'],
-                category=book_data['category'],
-                image_url=book_data.get('image_url'),
-                description=book_data.get('description'),
-                url=book_data.get('url', ''),
-                url_id=book_data.get('url_id', '')
-            )
-            
+            campos_validos = {
+                'title': book_data['title'],
+                'price': book_data['price'],
+                'rating': book_data['rating'],
+                'availability': book_data['availability'],
+                'category': book_data['category'],
+                'image_url': book_data.get('image_url', ''),
+                'description': book_data.get('description', 'Descrição não disponível')
+            }
+
+            # Remover campos None ou vazios
+            campos_validos = {k: v for k, v in campos_validos.items() if v is not None and v != ''}
+
+            novo_livro = Book(**campos_validos)
+
             db.session.add(novo_livro)
             db.session.commit()
-            logger.debug(f"Livro salvo: {book_data['title']} (ID: {book_data['url_id']})")
-            
+            logger.info(f"✅ Livro salvo: {book_data['title']}")
+
         except Exception as e:
-            logger.error(f"Erro ao salvar livro {book_data['title']}: {e}")
+            logger.error(f"❌ Erro ao salvar livro {book_data['title']}: {e}")
             db.session.rollback()
 
     def gerar_relatorio(self):
-        """Gera relatório das discrepâncias encontradas"""
+        """Gera relatório completo das discrepâncias"""
         if not self.discrepancies:
             return "CONCILIACAO: Sem discrepâncias encontradas"
         
@@ -469,15 +509,23 @@ class ScrapingReconciliation:
         for tipo, disc_list in por_tipo.items():
             relatorio.append(f"\n{tipo} ({len(disc_list)} casos):")
             for disc in disc_list:
-                edicoes_info = f" - {disc.get('edicoes_diferentes', 0)} edições diferentes" if disc.get('edicoes_diferentes', 0) > 0 else ""
-                relatorio.append(f"   {disc['categoria']}: {disc['detalhes']}{edicoes_info}")
+                if tipo == 'CATEGORIA_FALTANTE':
+                    relatorio.append(f"   🚨 {disc['categoria']}: {disc['detalhes']}")
+                else:
+                    edicoes_info = f" - {disc.get('edicoes_diferentes', 0)} edições diferentes" if disc.get('edicoes_diferentes', 0) > 0 else ""
+                    relatorio.append(f"   📚 {disc['categoria']}: {disc['detalhes']}{edicoes_info}")
         
         # Estatísticas resumidas
         total_faltantes = sum(disc.get('faltantes', 0) for disc in self.discrepancies)
         total_edicoes = sum(disc.get('edicoes_diferentes', 0) for disc in self.discrepancies)
         categorias_com_faltantes = len([disc for disc in self.discrepancies if disc.get('faltantes', 0) > 0])
+        categorias_inteiras_faltantes = len([disc for disc in self.discrepancies if disc['tipo'] == 'CATEGORIA_FALTANTE'])
         
-        relatorio.append(f"\n📊 RESUMO: {total_faltantes} livros faltantes em {categorias_com_faltantes} categorias")
+        relatorio.append(f"\n📊 RESUMO:")
+        relatorio.append(f"   • {total_faltantes} livros faltantes no total")
+        relatorio.append(f"   • {categorias_com_faltantes} categorias com livros faltantes")
+        relatorio.append(f"   • {categorias_inteiras_faltantes} categorias INTEIRAS faltando")
+        
         if total_edicoes > 0:
             relatorio.append(f"📚 EDIÇÕES DIFERENTES: {total_edicoes} títulos com múltiplas versões")
         
