@@ -4,7 +4,7 @@
 API REST completa para consulta, gestão e recomendação de livros com sistema de machine learning integrado. Desenvolvida com arquitetura modular e escalável, incluindo monitoramento em tempo real.
 O projeto é composto por um pipeline completo, que vai desde a ingestão e raspagem de dados (scraping) até a exposição dos dados via API pública, com monitoramento e métricas em Streamlit.
 
-## Dados produtivos~
+## Dados produtivos ##
 
 **URL DA APLICAÇÃO:**
 
@@ -62,45 +62,164 @@ https://streamlit-dashboard-production-f9ea.up.railway.app
 ## 🛠️ Instalação e Desenvolvimento
 
 ### 1. Clone o repositório
+
 Realize o clone do projeto:
 ```bash
 git clone https://github.com/veronicarocha/webscraping-books
 cd webscraping-books
+```
+
+### Recomendações ###
+### VSCode
+
+Editor de código recomendado para o projeto: VSCode.
+
+# Pré requisitos #
+
+## Python
+Tenha o python criado e configurado na maquina  (utilizado python-3.11.9)
+https://www.python.org/
+Na instalação IMPORTANTE marcar "Add Python to PATH"
+
+Verifique no terminal a versao instalada (Reinicie o terminal):
+
+```python --version ```
+
+## Node 
+interessante também instalar o Node para utilizar (quando e se necessário) npm install xxxx
+
+
+## Instalar Dependencias ##
+
+Depois crie a venv e instale as dependencias do projeto (comandos no terminal):
+
+```
 python -m venv venv
 source venv/bin/activate  # ou source venv\Scripts\activate 
 pip install -r requirements.txt
 ```
 
 ### 2. Variaveis de ambiente
+crie um arquivo na raiz do projeto .env com o conteudo abaixo: 
+
 ```bash
-DATABASE_URL=postgresql://usuario:senha@localhost/bookapi
-JWT_SECRET_KEY=sua-chave-secreta-aqui
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=senha-admin
-ML_ENGINEER_USERNAME=ml_engineer
-ML_ENGINEER_PASSWORD=senha-ml
+SECRET_KEY=minha-chave-super-secreta-local
+JWT_SECRET_KEY=jwt-chave-secreta-local
+DATABASE_URL=postgresql://postgres:senha@localhost:5432/bookapi
+ML_ENGINEER_PASSWORD=senha_ml_local
+```
+
+### Pré requisito
+Instalar o Docker e Postgres 
+
+```
+https://www.docker.com/products/docker-desktop/
+ou
+https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe
+```
+
+### 3. Setup da base
+
+Quando o docker estiver rodando, volte para o terminal e digite:
+
+```
+docker run --name postgres-bookapi -e POSTGRES_PASSWORD=senha -e POSTGRES_DB=bookapi -p 5432:5432 -d postgres:15
+
+```
+Para verificar se o postgres está rodando, execute o comando: 
+```docker ps ```
+
+Se o container estiver rodando corretamente, executar o setup:
+```python scripts/setup_database.py ```
+
+Terá um retorno tipo:
+
+```
+ python scripts/setup_database.py
+ >>> Modo: desenvolvimento (local)
+ >>> Database: PostgreSQL - localhost:5432
+✅ Tabelas criadas com sucesso!
+✅ Conexão com PostgreSQL testada!
+📊 Total de livros no banco: 0
 ```
 
 ### 3. Iniciar Serviços
 Rode os comandos abaixo em terminais separados:
 
-Terminal 1 - API Flask:
+# Terminal 1 - API Book-API:
 
 ```bash
-python app.py
+python run.py
 # API: http://localhost:5000
 # Docs: http://localhost:5000/apidocs
 
 ```
-Terminal 2 - Dashboard:
+Esse comando também verifica se a base está completa ou se precisa realizar o scraping dos dados ainda.
+
+Terá um retorno como:
+
+´´´
+
+ python run.py
+ >>> Modo: desenvolvimento (local)
+ >>> Database: PostgreSQL - localhost:5432
+>>> Tabelas criadas
+>>>  Análise da Base:
+>>>  Livros: 1
+>>>  Categorias: 1
+>>> INICIANDO SCRAPING INTELIGENTE
+>>>   Meta: 1000 livros
+>>>   Limite: 15 minutos
+>>>   Offset: 1 categorias
+2025-11-04 23:16:09,068 - app.services.scraper - INFO -  >>> BookScraper inicializado com sucesso
+2025-11-04 23:16:09,645 - app.services.scraper - INFO - Encontradas 50 categorias
+>>>    📂 Categorias para processar: 49/50
+>>> [2/50] Processando: Mystery
+>>>    Tempo: 0.0min | Livros: 1/1000
+2025-11-04 23:16:09,660 - app.services.scraper - INFO - Scraping categoria: Mystery
+2025-11-04 23:16:09,660 - app.services.scraper - INFO - Scraping página: http://books.toscrape.com/catalogue/category/books/mystery_3/index.html
+2025-11-04 23:16:13,875 - app.services.scraper - INFO - Scraping página: http://books.toscrape.com/catalogue/category/books/mystery_3/page-2.html
+2025-11-04 23:16:17,027 - app.services.scraper - INFO - ✅ Mystery: 32 livros coletados
+>>> Mystery: +32 novos,0 existentes
+>>> [3/50] Processando: Historical Fiction
+>>>    Tempo: 0.2min | Livros: 33/1000
+2025-11-04 23:16:18,116 - app.services.scraper - INFO - Scraping categoria: Historical Fiction
+2025-11-04 23:16:18,116 - app.services.scraper - INFO ....
+
+´´´
+
+E já terá acessível as rotas como :
+
+http://localhost:5000/apidocs/
+
+http://localhost:5000/api/v1/books?per_page=6
+
+
+# Terminal 2 - Dashboard:
+entrar na pasta do dashboard e instalar as dependencias do dashboard
+
+cd dashboard
+
+```pip install -r requirements.txt```
+
+
+Só depois subir a aplicação em si.
+
 ```bash
 cd dashboard
 streamlit run app.py
 # Dashboard: http://localhost:8501
 ```
+
 ### 4. Popular Banco de Dados
+
+Caso a base nao tenha ficado como esperado (1000 livros), com os dados carregados:
+Os scrits abaixo podem ser utilizados para "equalizar" a base
+
 ```bash
-python scripts/run_scraper.py
+python scripts/concilia_scraping.py
+ou
+python scripts/complete_scraping.py 
 ```
 
 ### 5. 📡 Uso da API

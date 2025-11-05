@@ -16,9 +16,11 @@ with app.app_context():
     
     book_count = Book.query.count()
     
-    # Conta categorias únicas existentes
-    categories_count = db.session.query(Book.category).distinct().count()
-    categories_count = categories_count-1
+    # CORREÇÃO: Cálculo correto do offset de categorias
+    if book_count > 0:
+        categories_count = db.session.query(Book.category).distinct().count()
+    else:
+        categories_count = 0  # Quando não há livros, offset é 0
     
     print(f">>>  Análise da Base:")
     print(f">>>  Livros: {book_count}")
@@ -39,7 +41,7 @@ with app.app_context():
             scraper = BookScraper()
             all_categories = scraper.get_categories()
             
-            # OFFSET: Pula categorias já processadas
+            # CORREÇÃO: Offset corrigido - agora pega todas as categorias quando categories_count = 0
             categories_to_process = dict(list(all_categories.items())[categories_count:])
             print(f">>>    📂 Categorias para processar: {len(categories_to_process)}/{len(all_categories)}")
             
@@ -96,7 +98,7 @@ with app.app_context():
             final_categories = db.session.query(Book.category).distinct().count()
             elapsed_minutes = (time.time() - start_time) / 60
             
-            print(f">>> SCRAPING  !")
+            print(f">>> SCRAPING CONCLUÍDO!")
             print(f">>>    Tempo total: {elapsed_minutes:.1f} minutos")
             print(f">>>    Categorias processadas: {processed_in_this_run}")
             print(f">>>    Livros adicionados: {total_added}")
