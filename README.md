@@ -17,6 +17,8 @@ https://web-production-962ea.up.railway.app/api/v1/health
 **URL DO DASHBOARD:**
 https://streamlit-dashboard-production-f9ea.up.railway.app
 
+**URL DA DOCUMENTAÇÃO:**
+https://web-production-962ea.up.railway.app/apidocs/#/
 
 ## 🏗️ Arquitetura
 - **Backend**: Flask + Flask-RESTful
